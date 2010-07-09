@@ -1,0 +1,14 @@
+<package>
+  <description brief="maplin_arm">
+
+     Driver for a very simple arm which uses just DC motors. No position feedback here.
+
+  </description>
+  <author>Alan Broun</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url></url>
+
+</package>
+
+

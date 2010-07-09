@@ -1,0 +1,14 @@
+<package>
+  <description brief="lynxmotion_arm">
+
+     lynxmotion_arm
+
+  </description>
+  <author>Alan Broun</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/lynxmotion_arm</url>
+
+</package>
+
+

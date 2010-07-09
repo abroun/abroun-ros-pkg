@@ -1,0 +1,11 @@
+<stack name="arm_drivers">
+  <description brief="arm_drivers">
+    Contains drivers for simple hobby robot arms such as the ones from Lynxmotion and Maplin
+  </description>
+  <author>Maintained by Alan Broun</author>
+  <license>BSD</license>  
+  <review status="unreviewed" notes=""/>
+  <url></url>
+  <depend stack="ros" />
+
+</stack>
