@@ -1,0 +1,4 @@
+<launch>
+    <!-- send gaffa urdf to param server -->
+    <param name="robot_description" command="$(find xacro)/xacro.py '$(find gaffa_description)/robots/gaffa.urdf.xacro'" />
+</launch>

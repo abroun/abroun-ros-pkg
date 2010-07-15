@@ -1,0 +1,24 @@
+<?xml version="1.0"?>
+<robot xmlns:sensor="http://playerstage.sourceforge.net/gazebo/xmlschema/#sensor"
+       xmlns:controller="http://playerstage.sourceforge.net/gazebo/xmlschema/#controller"
+       xmlns:interface="http://playerstage.sourceforge.net/gazebo/xmlschema/#interface"
+       xmlns:xacro="http://ros.org/wiki/xacro">
+
+  <xacro:macro name="maplin_upper_arm_gazebo" params="side">
+    <gazebo reference="${side}_upper_arm_link">
+      <sensor:contact name="${side}_upper_arm_contact_sensor">
+        <geom>${side}_upper_arm_link_geom</geom><!-- TODO -->
+        <updateRate>100.0</updateRate>
+        <controller:gazebo_ros_bumper name="${side}_upper_arm_gazebo_ros_bumper_controller" plugin="libgazebo_ros_bumper.so">
+          <alwaysOn>true</alwaysOn>
+          <updateRate>100.0</updateRate>
+          <bumperTopicName>${side}_upper_arm_bumper</bumperTopicName>
+          <interface:bumper name="${side}_upper_arm_gazebo_ros_bumper_iface" />
+        </controller:gazebo_ros_bumper>
+      </sensor:contact>
+      <turnGravityOff>true</turnGravityOff>
+      <material value="PR2/Green" />
+    </gazebo>
+  </xacro:macro>
+
+</robot>

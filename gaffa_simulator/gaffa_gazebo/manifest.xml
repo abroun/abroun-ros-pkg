@@ -1,0 +1,18 @@
+<package>
+  <description brief="gaffa_gazebo">
+
+     gaffa_gazebo
+
+  </description>
+  <author>Alan Broun</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/gaffa_gazebo</url>
+  <depend package="gaffa_description"/>
+  <depend package="gazebo_plugins"/>
+  <depend package="gazebo_tools"/>
+  <depend package="gazebo_worlds"/>
+
+</package>
+
+

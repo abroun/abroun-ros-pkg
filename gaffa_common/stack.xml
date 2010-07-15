@@ -1,0 +1,16 @@
+<stack>
+  <description brief="gaffa_common">
+
+    URDF description of the robot kinematics and dynamics, 3D models of robot components, information required for gazebo to simulate the Gaffa robot
+
+  </description>
+  <author>Maintained by Alan Broun</author>
+  <license>BSD</license>  
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/gaffa_common</url>
+  <depend stack="ros" />
+  <depend stack="common" /> <!-- xacro -->
+  <depend stack="common_msgs" /> <!-- geometry_msgs -->
+  <depend stack="robot_model" /> <!-- convex_decomposition, ivcon, urdf -->
+
+</stack>

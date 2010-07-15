@@ -1,0 +1,14 @@
+<launch>
+  
+  <!-- send gaffa urdf to param server -->
+  <include file="$(find gaffa_description)/robots/upload_gaffa.launch" />
+
+
+  <!-- push robot_description to factory and spawn robot in gazebo -->
+  <node name="gaffa_gazebo_model" pkg="gazebo_tools" type="gazebo_model" args="$(optenv ROBOT_INITIAL_POSE) -p robot_description spawn" respawn="false" output="screen" />
+ 
+  <!-- default bringup script -->
+  <!--<include file="$(find gaffa_gazebo)/launch/gaffa_bringup.launch" />-->
+
+</launch>
+

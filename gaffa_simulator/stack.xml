@@ -1,0 +1,11 @@
+<stack>
+  <description brief="gaffa_simulator">gaffa_simulator</description>
+  <author>Maintained by Alan Broun</author>
+  <license>BSD</license>  
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/gaffa_simulator</url>
+  <depend stack="ros" />
+  <depend stack="gaffa_common" /> <!-- gaffa_description -->
+  <depend stack="simulator_gazebo" /> <!-- gazebo_tools, gazebo, gazebo_plugins, gazebo_worlds -->
+
+</stack>
