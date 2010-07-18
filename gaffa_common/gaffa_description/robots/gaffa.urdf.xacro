@@ -1,5 +1,5 @@
 <?xml version="1.0"?>
-<robot name="pr2"
+<robot name="gaffa"
        xmlns:xi="http://www.w3.org/2001/XInclude"
        xmlns:gazebo="http://playerstage.sourceforge.net/gazebo/xmlschema/#gz"
        xmlns:model="http://playerstage.sourceforge.net/gazebo/xmlschema/#model"
@@ -13,101 +13,339 @@
        xmlns:controller="http://playerstage.sourceforge.net/gazebo/xmlschema/#controller"
        xmlns:physics="http://playerstage.sourceforge.net/gazebo/xmlschema/#physics">
 
-  <joint name="base_block_joint" type="fixed"> 
+  <!--<joint name="base_block_joint" type="fixed"> 
     <parent link="world" />
     <origin xyz="0 0 0" rpy="0 0 0" />
     <child link="base_block" />
-  </joint>
+  </joint>-->
   
   <property name="M_PI" value="3.1415926535897931" />
+  <property name="BASE_MASS" value="1000" />
+  <property name="BASE_LENGTH" value="0.3" />
+  <property name="BASE_WIDTH" value="0.15" />
+  <property name="BASE_HEIGHT" value="0.018" />
   
+  <property name="BASE_ROTATE_MASS" value="0.25" />
+  <property name="BASE_ROTATE_RADIUS" value="0.05" />
+  <property name="BASE_ROTATE_HEIGHT" value="0.0466" />
+  
+  <property name="SHOULDER_HEIGHT" value="0.06193" />
+  
+  <property name="UPPER_ARM_MASS" value="0.1" />
+  <property name="UPPER_ARM_LENGTH" value="0.154" />
+  <property name="UPPER_ARM_WIDTH" value="0.053" />
+  <property name="UPPER_ARM_HEIGHT" value="0.0244" />
+  
+  <!-- Mass includes both elbow and wrist servos -->
+  <property name="FORE_ARM_MASS" value="0.21" />
+  <property name="FORE_ARM_LENGTH" value="0.154" />
+  <property name="FORE_ARM_WIDTH" value="0.053" />
+  <property name="FORE_ARM_HEIGHT" value="0.0244" />
+  
+  <!-- Mass includes gripper rotate servo -->
+  <property name="WRIST_MASS" value="0.065" /> 
+  <property name="WRIST_LENGTH" value="0.0346" />
+  <property name="WRIST_WIDTH" value="0.053" />
+  <property name="WRIST_HEIGHT" value="0.0244" />
+  
+  <!-- Mass includes gripper 'grip' servo -->
+  <property name="GRIPPER_BASE_MASS" value="0.065" /> 
+  <property name="GRIPPER_BASE_LENGTH" value="0.037" />
+  <property name="GRIPPER_BASE_WIDTH" value="0.0648" />
+  <property name="GRIPPER_BASE_HEIGHT" value="0.0244" />
+  
+  <property name="GRIPPER_FINGER_MASS" value="0.01" /> 
+  <property name="GRIPPER_FINGER_LENGTH" value="0.0315" />
+  <property name="GRIPPER_FINGER_WIDTH" value="0.0144" />
+  <property name="GRIPPER_FINGER_HEIGHT" value="0.0244" />
+  
+  <!-- Base Block -->
   <link name="base_block">
     <inertial>
-      <mass value="1000" />
-      <origin xyz="0 0 0" />
-      <inertia ixx="100"  ixy="0"  ixz="0" iyy="100" iyz="0" izz="100" />
+      <mass value="${BASE_MASS}" />
+      <origin xyz="0 0 ${BASE_HEIGHT/2}" />
+      <inertia ixx="${BASE_MASS*(BASE_WIDTH*BASE_WIDTH + BASE_HEIGHT*BASE_HEIGHT)/12.0}"  
+               ixy="0" ixz="0" 
+               iyy="${BASE_MASS*(BASE_LENGTH*BASE_LENGTH + BASE_HEIGHT*BASE_HEIGHT)/12.0}" 
+               iyz="0" 
+               izz="${BASE_MASS*(BASE_LENGTH*BASE_LENGTH + BASE_WIDTH*BASE_WIDTH)/12.0}" />
     </inertial> 
     <visual>
-      <origin xyz="0 0 0" rpy="0 0 0" />
+      <origin xyz="0 0 ${BASE_HEIGHT/2}" rpy="0 0 0" />
       <geometry name="base_block_visual_geom">
-        <box size="0.3 0.14 0.01" />
+        <box size="${BASE_LENGTH} ${BASE_WIDTH} ${BASE_HEIGHT}" />
       </geometry>
     </visual> 
     <collision>
-      <origin xyz="0 0 0" rpy="0.0 0.0 0.0" />
+      <origin xyz="0 0 ${BASE_HEIGHT/2}" rpy="0.0 0.0 0.0" />
       <geometry name="base_block_collision_geom">
-        <box size="0.3 0.14 0.01" />
+        <box size="${BASE_LENGTH} ${BASE_WIDTH} ${BASE_HEIGHT}" />
       </geometry>
     </collision>
   </link>
   <gazebo reference="base_block">
-    <material>Gazebo/GrassFloor</material>
-    <turnGravityOff>true</turnGravityOff>
-    <selfCollide>false</selfCollide>
+    <material>Gazebo/LightWood</material>
+    <turnGravityOff>false</turnGravityOff>
+    <selfCollide>true</selfCollide>
   </gazebo>
   
+  <!-- Base Rotate -->
   <joint name="base_rotate_joint" type="revolute" >
     <axis xyz="0 0 1" />
     <limit upper="${M_PI/2}" lower="${-M_PI/2}" effort="100" velocity="5" />
     <parent link="base_block" />
-    <origin xyz="0 0 0.061" rpy="0 0 0" />
+    <origin xyz="0 0 ${BASE_ROTATE_HEIGHT/2 + BASE_HEIGHT}" rpy="0 0 0" />
     <child link="base_rotate_link" />
   </joint>
   <link name="base_rotate_link">
     <inertial >
-      <mass value="10" />
-      <origin xyz="0.4 0 0" /> 
-      <inertia  ixx="0.1" ixy="0.0"  ixz="0.0"  iyy="0.1"  iyz="0.0"  izz="0.018" />
+      <mass value="${BASE_ROTATE_MASS}" />
+      <origin xyz="0 0 0" /> 
+      <inertia ixx="${BASE_ROTATE_MASS*(3*BASE_ROTATE_RADIUS*BASE_ROTATE_RADIUS + BASE_ROTATE_HEIGHT*BASE_ROTATE_HEIGHT)/12.0}" 
+               ixy="0.0"  ixz="0.0"  
+               iyy="${BASE_ROTATE_MASS*(3*BASE_ROTATE_RADIUS*BASE_ROTATE_RADIUS + BASE_ROTATE_HEIGHT*BASE_ROTATE_HEIGHT)/12.0}"  
+               iyz="0.0"  
+               izz="${(BASE_ROTATE_MASS*BASE_ROTATE_RADIUS*BASE_ROTATE_RADIUS)/2.0}" />
     </inertial>
     <visual >
-      <origin xyz="0.0 0 -0.025" rpy="0 0 0" />
-      <geometry name="base_rotate_mesh_file">
-        <cylinder radius="0.06" length="0.05" />
+      <origin xyz="0.0 0 0" rpy="0 0 0" />
+      <geometry name="base_rotate_visual_geom">
+        <cylinder radius="${BASE_ROTATE_RADIUS}" length="${BASE_ROTATE_HEIGHT}" />
       </geometry>
     </visual>
     <collision >
-      <origin xyz="0.0 0 -0.025" rpy="0 0 0" />
+      <origin xyz="0.0 0 0" rpy="0 0 0" />
       <geometry name="base_rotate_collision_geom">
-        <cylinder radius="0.06" length="0.05" />
+        <cylinder radius="${BASE_ROTATE_RADIUS}" length="${BASE_ROTATE_HEIGHT}" />
       </geometry>
     </collision>
   </link>
   <gazebo reference="base_rotate_link">
     <material>Gazebo/Red</material>
-    <turnGravityOff>true</turnGravityOff>
-    <selfCollide>false</selfCollide>
+    <turnGravityOff>false</turnGravityOff>
+    <selfCollide>true</selfCollide>
   </gazebo>
   
+  <!-- Shoulder and Upper arm -->
   <joint name="shoulder_rotate_joint" type="revolute" >
-    <axis xyz="0 1 0" />
-    <limit upper="0" lower="${-3*M_PI/4}" effort="100" velocity="5" />
+    <axis xyz="0 0 1" />
+    <limit upper="${M_PI/2}" lower="0" effort="100" velocity="5" />
     <parent link="base_rotate_link" />
-    <origin xyz="0 0 0.025" rpy="0 0 0" />
+    <origin xyz="0 0 ${SHOULDER_HEIGHT - BASE_ROTATE_HEIGHT/2}" rpy="${M_PI/2} 0 0" />
     <child link="upper_arm_link" />
   </joint>
   <link name="upper_arm_link">
     <inertial >
-      <mass value="10" />
-      <origin xyz="0.08 0 0" /> 
-      <inertia  ixx="0.1" ixy="0.0"  ixz="0.0"  iyy="0.1"  iyz="0.0"  izz="0.1" />
+      <mass value="${UPPER_ARM_MASS}" />
+      <origin xyz="${UPPER_ARM_LENGTH/2} 0 0" /> 
+      <inertia ixx="${UPPER_ARM_MASS*(UPPER_ARM_WIDTH*UPPER_ARM_WIDTH + UPPER_ARM_HEIGHT*UPPER_ARM_HEIGHT)/12.0}"  
+               ixy="0" ixz="0" 
+               iyy="${UPPER_ARM_MASS*(UPPER_ARM_LENGTH*UPPER_ARM_LENGTH + UPPER_ARM_WIDTH*UPPER_ARM_WIDTH)/12.0}" 
+               iyz="0" 
+               izz="${UPPER_ARM_MASS*(UPPER_ARM_LENGTH*UPPER_ARM_LENGTH + UPPER_ARM_HEIGHT*UPPER_ARM_HEIGHT)/12.0}" />
     </inertial>
     <visual >
-      <origin xyz="0.08 0 0.0" rpy="0 0 0" />
-      <geometry name="upper_arm_mesh_file">
-        <box size="0.2 0.05 0.05" />
+      <origin xyz="${UPPER_ARM_LENGTH/2} 0 0.0" rpy="0 0 0" />
+      <geometry name="upper_arm_visual_geom">
+        <box size="${UPPER_ARM_LENGTH} ${UPPER_ARM_HEIGHT} ${UPPER_ARM_WIDTH}" />
       </geometry>
     </visual>
     <collision >
-      <origin xyz="0.08 0 0.0" rpy="0 0 0" />
+      <origin xyz="${UPPER_ARM_LENGTH/2} 0 0.0" rpy="0 0 0" />
       <geometry name="upper_arm_collision_geom">
-        <box size="0.2 0.05 0.05" />
+        <box size="${UPPER_ARM_LENGTH} ${UPPER_ARM_HEIGHT} ${UPPER_ARM_WIDTH}" />
       </geometry>
     </collision>
   </link>
   <gazebo reference="upper_arm_link">
     <material>Gazebo/Blue</material>
-    <turnGravityOff>true</turnGravityOff>
-    <selfCollide>false</selfCollide>
+    <turnGravityOff>false</turnGravityOff>
+    <selfCollide>true</selfCollide>
+  </gazebo>
+  
+  <!-- Elbow and Forearm -->
+  <joint name="elbow_rotate_joint" type="revolute" >
+    <axis xyz="0 0 1" />
+    <limit upper="0" lower="${-3*M_PI/4}" effort="100" velocity="5" />
+    <parent link="upper_arm_link" />
+    <origin xyz="${UPPER_ARM_LENGTH} 0 0.0" rpy="0 0 0" />
+    <child link="fore_arm_link" />
+  </joint>
+  <link name="fore_arm_link">
+    <inertial >
+      <mass value="${FORE_ARM_MASS}" />
+      <origin xyz="${FORE_ARM_LENGTH/2} 0 0" /> 
+      <inertia ixx="${FORE_ARM_MASS*(FORE_ARM_WIDTH*FORE_ARM_WIDTH + FORE_ARM_HEIGHT*FORE_ARM_HEIGHT)/12.0}"  
+               ixy="0" ixz="0" 
+               iyy="${FORE_ARM_MASS*(FORE_ARM_LENGTH*FORE_ARM_LENGTH + FORE_ARM_WIDTH*FORE_ARM_WIDTH)/12.0}" 
+               iyz="0" 
+               izz="${FORE_ARM_MASS*(FORE_ARM_LENGTH*FORE_ARM_LENGTH + FORE_ARM_HEIGHT*FORE_ARM_HEIGHT)/12.0}" />
+    </inertial>
+    <visual >
+      <origin xyz="${FORE_ARM_LENGTH/2} 0 0.0" rpy="0 0 0" />
+      <geometry name="fore_arm_visual_geom">
+        <box size="${FORE_ARM_LENGTH} ${FORE_ARM_HEIGHT} ${FORE_ARM_WIDTH}" />
+      </geometry>
+    </visual>
+    <collision >
+      <origin xyz="${FORE_ARM_LENGTH/2} 0 0.0" rpy="0 0 0" />
+      <geometry name="fore_arm_collision_geom">
+        <box size="${FORE_ARM_LENGTH} ${FORE_ARM_HEIGHT} ${FORE_ARM_WIDTH}" />
+      </geometry>
+    </collision>
+  </link>
+  <gazebo reference="fore_arm_link">
+    <material>Gazebo/White</material>
+    <turnGravityOff>false</turnGravityOff>
+    <selfCollide>true</selfCollide>
+  </gazebo>
+  
+  <!-- Wrist -->
+  <joint name="wrist_rotate_joint" type="revolute" >
+    <axis xyz="0 0 1" />
+    <limit upper="${M_PI/2}" lower="${-M_PI/2}" effort="100" velocity="5" />
+    <parent link="fore_arm_link" />
+    <origin xyz="${FORE_ARM_LENGTH} 0 0.0" rpy="0 0 0" />
+    <child link="wrist_link" />
+  </joint>
+  <link name="wrist_link">
+    <inertial >
+      <mass value="${WRIST_MASS}" />
+      <origin xyz="${WRIST_LENGTH/2} 0 0" /> 
+      <inertia ixx="${WRIST_MASS*(WRIST_WIDTH*WRIST_WIDTH + WRIST_HEIGHT*WRIST_HEIGHT)/12.0}"  
+               ixy="0" ixz="0" 
+               iyy="${WRIST_MASS*(WRIST_LENGTH*WRIST_LENGTH + WRIST_WIDTH*WRIST_WIDTH)/12.0}" 
+               iyz="0" 
+               izz="${WRIST_MASS*(WRIST_LENGTH*WRIST_LENGTH + WRIST_HEIGHT*WRIST_HEIGHT)/12.0}" />
+    </inertial>
+    <visual >
+      <origin xyz="${WRIST_LENGTH/2} 0 0.0" rpy="0 0 0" />
+      <geometry name="wrist_visual_geom">
+        <box size="${WRIST_LENGTH} ${WRIST_HEIGHT} ${WRIST_WIDTH}" />
+      </geometry>
+    </visual>
+    <collision >
+      <origin xyz="${WRIST_LENGTH/2} 0 0.0" rpy="0 0 0" />
+      <geometry name="wrist_collision_geom">
+        <box size="${WRIST_LENGTH} ${WRIST_HEIGHT} ${WRIST_WIDTH}" />
+      </geometry>
+    </collision>
+  </link>
+  <gazebo reference="wrist_link">
+    <material>Gazebo/Red</material>
+    <turnGravityOff>false</turnGravityOff>
+    <selfCollide>true</selfCollide>
+  </gazebo>
+  
+  <!-- Gripper base -->
+  <joint name="gripper_rotate_joint" type="revolute" >
+    <axis xyz="0 0 1" />
+    <limit upper="${M_PI/2}" lower="${-M_PI/2}" effort="100" velocity="5" />
+    <parent link="wrist_link" />
+    <origin xyz="${WRIST_LENGTH} 0 0.0" rpy="0 ${M_PI/2} 0" />
+    <child link="gripper_base_link" />
+  </joint>
+  <link name="gripper_base_link">
+    <inertial >
+      <mass value="${GRIPPER_BASE_MASS}" />
+      <origin xyz="${GRIPPER_BASE_LENGTH/2} 0 0" /> 
+      <inertia ixx="${GRIPPER_BASE_MASS*(GRIPPER_BASE_LENGTH*GRIPPER_BASE_LENGTH + GRIPPER_BASE_HEIGHT*GRIPPER_BASE_HEIGHT)/12.0}" 
+               ixy="0" ixz="0" 
+               iyy="${GRIPPER_BASE_MASS*(GRIPPER_BASE_LENGTH*GRIPPER_BASE_LENGTH + GRIPPER_BASE_WIDTH*GRIPPER_BASE_WIDTH)/12.0}"
+               iyz="0" 
+               izz="${GRIPPER_BASE_MASS*(GRIPPER_BASE_WIDTH*GRIPPER_BASE_WIDTH + GRIPPER_BASE_HEIGHT*GRIPPER_BASE_HEIGHT)/12.0}" />
+    </inertial>
+    <visual >
+      <origin xyz="0 0 ${GRIPPER_BASE_LENGTH/2}" rpy="0 0 0" />
+      <geometry name="gripper_base_visual_geom">
+        <box size="${GRIPPER_BASE_WIDTH} ${GRIPPER_BASE_HEIGHT} ${GRIPPER_BASE_LENGTH}" />
+      </geometry>
+    </visual>
+    <collision >
+      <origin xyz="0 0 ${GRIPPER_BASE_LENGTH/2}" rpy="0 0 0" />
+      <geometry name="gripper_base_collision_geom">
+        <box size="${GRIPPER_BASE_WIDTH} ${GRIPPER_BASE_HEIGHT} ${GRIPPER_BASE_LENGTH}" />
+      </geometry>
+    </collision>
+  </link>
+  <gazebo reference="gripper_base_link">
+    <material>Gazebo/Black</material>
+    <turnGravityOff>false</turnGravityOff>
+    <selfCollide>true</selfCollide>
+  </gazebo>
+  
+  <!-- Gripper left finger -->
+  <joint name="gripper_left_prismatic_joint" type="prismatic" >
+    <axis xyz="1 0 0" />
+    <limit upper="${GRIPPER_BASE_WIDTH/2 - GRIPPER_FINGER_WIDTH/2}" lower="${GRIPPER_FINGER_WIDTH/2}" effort="100" velocity="5" />
+    <parent link="gripper_base_link" />
+    <origin xyz="0 0 ${GRIPPER_BASE_LENGTH}" rpy="0 0 0" />
+    <child link="gripper_left_finger_link" />
+  </joint>
+  <link name="gripper_left_finger_link">
+    <inertial >
+      <mass value="${GRIPPER_FINGER_MASS}" />
+      <origin xyz="${GRIPPER_FINGER_LENGTH/2} 0 0" /> 
+      <inertia ixx="${GRIPPER_FINGER_MASS*(GRIPPER_FINGER_LENGTH*GRIPPER_FINGER_LENGTH + GRIPPER_FINGER_HEIGHT*GRIPPER_FINGER_HEIGHT)/12.0}" 
+               ixy="0" ixz="0" 
+               iyy="${GRIPPER_FINGER_MASS*(GRIPPER_FINGER_LENGTH*GRIPPER_FINGER_LENGTH + GRIPPER_FINGER_WIDTH*GRIPPER_FINGER_WIDTH)/12.0}"
+               iyz="0" 
+               izz="${GRIPPER_FINGER_MASS*(GRIPPER_FINGER_WIDTH*GRIPPER_FINGER_WIDTH + GRIPPER_FINGER_HEIGHT*GRIPPER_FINGER_HEIGHT)/12.0}" />
+    </inertial>
+    <visual >
+      <origin xyz="0 0 ${GRIPPER_FINGER_LENGTH/2}" rpy="0 0 0" />
+      <geometry name="gripper_finger_visual_geom">
+        <box size="${GRIPPER_FINGER_WIDTH} ${GRIPPER_FINGER_HEIGHT} ${GRIPPER_FINGER_LENGTH}" />
+      </geometry>
+    </visual>
+    <collision >
+      <origin xyz="0 0 ${GRIPPER_FINGER_LENGTH/2}" rpy="0 0 0" />
+      <geometry name="gripper_finger_collision_geom">
+        <box size="${GRIPPER_FINGER_WIDTH} ${GRIPPER_FINGER_HEIGHT} ${GRIPPER_FINGER_LENGTH}" />
+      </geometry>
+    </collision>
+  </link>
+  <gazebo reference="gripper_left_finger_link">
+    <material>Gazebo/Black</material>
+    <turnGravityOff>false</turnGravityOff>
+    <selfCollide>true</selfCollide>
+  </gazebo>
+  
+  <!-- Gripper right finger -->
+  <joint name="gripper_right_prismatic_joint" type="prismatic" >
+    <axis xyz="1 0 0" />
+    <limit upper="${GRIPPER_BASE_WIDTH/2 - GRIPPER_FINGER_WIDTH/2}" lower="${GRIPPER_FINGER_WIDTH/2}" effort="100" velocity="5" />
+    <parent link="gripper_base_link" />
+    <origin xyz="0 0 ${GRIPPER_BASE_LENGTH}" rpy="0 0 ${M_PI}" />
+    <child link="gripper_right_finger_link" />
+  </joint>
+  <link name="gripper_right_finger_link">
+    <inertial >
+      <mass value="${GRIPPER_FINGER_MASS}" />
+      <origin xyz="${GRIPPER_FINGER_LENGTH/2} 0 0" /> 
+      <inertia ixx="${GRIPPER_FINGER_MASS*(GRIPPER_FINGER_LENGTH*GRIPPER_FINGER_LENGTH + GRIPPER_FINGER_HEIGHT*GRIPPER_FINGER_HEIGHT)/12.0}" 
+               ixy="0" ixz="0" 
+               iyy="${GRIPPER_FINGER_MASS*(GRIPPER_FINGER_LENGTH*GRIPPER_FINGER_LENGTH + GRIPPER_FINGER_WIDTH*GRIPPER_FINGER_WIDTH)/12.0}"
+               iyz="0" 
+               izz="${GRIPPER_FINGER_MASS*(GRIPPER_FINGER_WIDTH*GRIPPER_FINGER_WIDTH + GRIPPER_FINGER_HEIGHT*GRIPPER_FINGER_HEIGHT)/12.0}" />
+    </inertial>
+    <visual >
+      <origin xyz="0 0 ${GRIPPER_FINGER_LENGTH/2}" rpy="0 0 0" />
+      <geometry name="gripper_finger_visual_geom">
+        <box size="${GRIPPER_FINGER_WIDTH} ${GRIPPER_FINGER_HEIGHT} ${GRIPPER_FINGER_LENGTH}" />
+      </geometry>
+    </visual>
+    <collision >
+      <origin xyz="0 0 ${GRIPPER_FINGER_LENGTH/2}" rpy="0 0 0" />
+      <geometry name="gripper_finger_collision_geom">
+        <box size="${GRIPPER_FINGER_WIDTH} ${GRIPPER_FINGER_HEIGHT} ${GRIPPER_FINGER_LENGTH}" />
+      </geometry>
+    </collision>
+  </link>
+  <gazebo reference="gripper_right_finger_link">
+    <material>Gazebo/Black</material>
+    <turnGravityOff>false</turnGravityOff>
+    <selfCollide>true</selfCollide>
   </gazebo>
 
   <gazebo>
@@ -177,3 +415,6 @@
 <!--   <xacro:maplin_upper_arm side="r" reflect="-1" parent="base_link"/> -->
 
 <!-- </robot> -->
+
+
+
