@@ -1,0 +1,40 @@
+base_rotate_position_controller:
+  type: robot_mechanism_controllers/JointPositionController
+  joint: base_rotate_joint
+  pid: &base_rotate_position_gains
+    p: 10.0
+    d: 0.0
+    i: 0.0
+    i_clamp: 1.0
+shoulder_rotate_position_controller:
+  type: robot_mechanism_controllers/JointPositionController
+  joint: shoulder_rotate_joint
+  pid: &shoulder_rotate_position_gains
+    p: 7.0
+    d: 0.0
+    i: 0.0
+    i_clamp: 1.0
+elbow_rotate_position_controller:
+  type: robot_mechanism_controllers/JointPositionController
+  joint: elbow_rotate_joint
+  pid: &elbow_rotate_position_gains
+    p: 7.0
+    d: 0.0
+    i: 0.0
+    i_clamp: 1.0
+wrist_rotate_position_controller:
+  type: robot_mechanism_controllers/JointPositionController
+  joint: wrist_rotate_joint
+  pid: &wrist_rotate_position_gains
+    p: 7.0
+    d: 0.0
+    i: 0.0
+    i_clamp: 1.0
+gripper_rotate_position_controller:
+  type: robot_mechanism_controllers/JointPositionController
+  joint: gripper_rotate_joint
+  pid: &gripper_rotate_position_gains
+    p: 7.0
+    d: 0.0
+    i: 0.0
+    i_clamp: 1.0

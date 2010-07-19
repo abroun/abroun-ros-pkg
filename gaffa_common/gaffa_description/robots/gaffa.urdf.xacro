@@ -20,7 +20,7 @@
   </joint>-->
   
   <property name="M_PI" value="3.1415926535897931" />
-  <property name="BASE_MASS" value="1000" />
+  <property name="BASE_MASS" value="10" />
   <property name="BASE_LENGTH" value="0.3" />
   <property name="BASE_WIDTH" value="0.15" />
   <property name="BASE_HEIGHT" value="0.018" />
@@ -356,11 +356,11 @@
       </controller:gazebo_ros_time>
 
       <!-- PR2_ACTARRAY -->
-<!--      <controller:gazebo_ros_controller_manager name="gazebo_ros_controller_manager" plugin="libgazebo_ros_controller_manager.so">
+      <controller:gazebo_ros_controller_manager name="gazebo_ros_controller_manager" plugin="libgazebo_ros_controller_manager.so">
         <alwaysOn>true</alwaysOn>
         <updateRate>1000.0</updateRate>
         <interface:audio name="gazebo_ros_controller_manager_dummy_iface" />
-      </controller:gazebo_ros_controller_manager>-->
+      </controller:gazebo_ros_controller_manager>
 
       <!-- gazebo_ros_p3d for position groundtruth -->
 <!--      <controller:gazebo_ros_p3d name="p3d_link1_controller" plugin="libgazebo_ros_p3d.so">
@@ -372,49 +372,42 @@
           <interface:position name="p3d_link1_position"/>
       </controller:gazebo_ros_p3d>-->
   </gazebo>
+  
   <!-- mechanism controls -->
-<!--   <include filename="./single_link.transmission.xacro" /> -->
+  <transmission type="pr2_mechanism_model/SimpleTransmission" name="base_rotate_trans">
+    <actuator name="base_rotate_motor" />
+    <joint name="base_rotate_joint" />
+    <mechanicalReduction>1</mechanicalReduction>
+    <motorTorqueConstant>1</motorTorqueConstant>
+  </transmission>
+  <transmission type="pr2_mechanism_model/SimpleTransmission" name="shoulder_rotate_trans">
+    <actuator name="shoulder_rotate_motor" />
+    <joint name="shoulder_rotate_joint" />
+    <mechanicalReduction>1</mechanicalReduction>
+    <motorTorqueConstant>1</motorTorqueConstant>
+  </transmission>
+  <transmission type="pr2_mechanism_model/SimpleTransmission" name="elbow_rotate_trans">
+    <actuator name="elbow_rotate_motor" />
+    <joint name="elbow_rotate_joint" />
+    <mechanicalReduction>1</mechanicalReduction>
+    <motorTorqueConstant>1</motorTorqueConstant>
+  </transmission>
+  <transmission type="pr2_mechanism_model/SimpleTransmission" name="wrist_rotate_trans">
+    <actuator name="wrist_rotate_motor" />
+    <joint name="wrist_rotate_joint" />
+    <mechanicalReduction>1</mechanicalReduction>
+    <motorTorqueConstant>1</motorTorqueConstant>
+  </transmission>
+  <transmission type="pr2_mechanism_model/SimpleTransmission" name="gripper_rotate_trans">
+    <actuator name="gripper_rotate_motor" />
+    <joint name="gripper_rotate_joint" />
+    <mechanicalReduction>1</mechanicalReduction>
+    <motorTorqueConstant>1</motorTorqueConstant>
+  </transmission>
 
 </robot>
 
 
-<!--<?xml version="1.0"?>
-<robot xmlns:sensor="http://playerstage.sourceforge.net/gazebo/xmlschema/#sensor"
-       xmlns:controller="http://playerstage.sourceforge.net/gazebo/xmlschema/#controller"
-       xmlns:interface="http://playerstage.sourceforge.net/gazebo/xmlschema/#interface"
-       xmlns:xacro="http://playerstage.sourceforge.net/gazebo/xmlschema/#interface"
-       name="pr2" >-->
-  
-  <!-- The following included files set up definitions of parts of the robot body -->
-  <!-- misc common stuff? -->
-  <!--<include filename="$(find gaffa_description)/urdf/common.xacro" />
-  --><!-- Maplin Arm -->
- <!-- <include filename="$(find gaffa_description)/urdf/maplin_upper_arm/maplin_upper_arm.urdf.xacro" />
-  --><!-- Maplin gripper -->
-  <!--<include filename="$(find gaffa_description)/urdf/maplin_gripper.urdf.xacro" />-->
-  <!-- Gaffa base -->
-<!--   <include filename="$(find gaffa_description)/urdf/base/base.urdf.xacro" /> -->
-  
-  <!-- generic simulator_gazebo plugins for starting mechanism control, ros time, ros battery -->
-  <!--<include filename="$(find pr2_description)/gazebo/gazebo.urdf.xacro" />-->
-  
-  <!-- materials for visualization -->
-<!--   <include filename="$(find pr2_description)/urdf/materials.urdf.xacro" /> -->
-
-  <!-- Now we can start using the macros included above to define the actual PR2 -->
-
-  <!-- The first use of a macro.  This one was defined in base.urdf.xacro above.
-       A macro like this will expand to a set of link and joint definitions, and to additional
-       Gazebo-related extensions (sensor plugins, etc).  The macro takes an argument, name, 
-       that equals "base", and uses it to generate names for its component links and joints 
-       (e.g., base_link).  The included origin block is also an argument to the macro.  By convention, 
-       the origin block defines where the component is w.r.t its parent (in this case the parent 
-       is the world frame). For more, see http://www.ros.org/wiki/xacro -->
-<!--   <xacro:gaffa_base name="base"/> -->
-
-<!--   <xacro:maplin_upper_arm side="r" reflect="-1" parent="base_link"/> -->
-
-<!-- </robot> -->
 
 
 
