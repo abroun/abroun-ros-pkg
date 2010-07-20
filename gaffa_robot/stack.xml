@@ -1,0 +1,9 @@
+<stack>
+  <description brief="gaffa_robot">This stack provides the components required to bring up a real world Gaffa robot</description>
+  <author>Maintained by Alan Broun</author>
+  <license>BSD</license>  
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/gaffa_robot</url>
+  <depend stack="ros" />
+
+</stack>

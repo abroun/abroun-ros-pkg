@@ -1,0 +1,14 @@
+<package>
+  <description brief="arm_driver_msgs">
+
+     Common messages for controlling servo and direct drive arms
+
+  </description>
+  <author>Alan Broun</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/arm_driver_msgs</url>
+
+</package>
+
+

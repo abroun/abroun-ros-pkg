@@ -1,0 +1,30 @@
+base: {
+  channelIdx: 1,
+  endPulseWidth: 530,
+  maxAngle: 1.5707963267948966,
+  minAngle: -1.5707963267948966,
+  startPulseWidth: 2390 }
+shoulder: {
+  channelIdx: 2,
+  endPulseWidth: 1890,
+  maxAngle: 2.3561944901923448,
+  minAngle: 0.0,
+  startPulseWidth: 730 }
+elbow: {
+  channelIdx: 3,
+  endPulseWidth: 950,
+  maxAngle: 0.0,
+  minAngle: -2.3561944901923448,
+  startPulseWidth: 2340 }
+wrist_bend: {
+  channelIdx: 4,
+  endPulseWidth: 2390,
+  maxAngle: 3.1415926535897931,
+  minAngle: 0.0,
+  startPulseWidth: 620 }
+wrist_rotate: {
+  channelIdx: 5,
+  endPulseWidth: 2410,
+  maxAngle: 1.5707963267948966,
+  minAngle: -1.5707963267948966,
+  startPulseWidth: 610 }
