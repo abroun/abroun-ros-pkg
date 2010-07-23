@@ -12,6 +12,7 @@
   <depend package="gazebo_plugins"/>
   <depend package="gazebo_tools"/>
   <depend package="gazebo_worlds"/>
+  <depend package="arm_driver_msgs" />
 
 </package>
 

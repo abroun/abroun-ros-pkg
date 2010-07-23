@@ -1,0 +1,14 @@
+!ConfigData
+servoAngles: [-4.2589789332431821e-15, 2.1507124125592916, -2.3144956959219121, 1.7717121360361043,
+  0.0]
+servoConfigList:
+- !ServoConfig {channelIdx: 1, endPulseWidth: 530, maxAngle: 1.5707963267948966, minAngle: -1.5707963267948966,
+  startPulseWidth: 2390}
+- !ServoConfig {channelIdx: 2, endPulseWidth: 1890, maxAngle: 2.3561944901923448,
+  minAngle: 0.0, startPulseWidth: 730}
+- !ServoConfig {channelIdx: 3, endPulseWidth: 950, maxAngle: 0.0, minAngle: -2.3561944901923448,
+  startPulseWidth: 2340}
+- !ServoConfig {channelIdx: 4, endPulseWidth: 2390, maxAngle: 3.1415926535897931,
+  minAngle: 0.0, startPulseWidth: 620}
+- !ServoConfig {channelIdx: 5, endPulseWidth: 2410, maxAngle: 1.5707963267948966,
+  minAngle: -1.5707963267948966, startPulseWidth: 610}

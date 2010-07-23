@@ -1,10 +1,10 @@
 #! /usr/bin/python
 # ROS imports
 import roslib
-roslib.load_manifest( 'lynxmotion_arm' )
+roslib.load_manifest( 'gaffa_simulator' )
 import rospy
 
-from arm_driver_msgs.msg import *
+from lynxmotion_arm.msg import *
 
 import time
 import math
@@ -30,7 +30,7 @@ class ROS_SSC32Server():
         
         # Setup topics so that  users can control the servos
         self.setServoAnglesTopic = rospy.Subscriber( "setServoAngles", 
-            arm_driver_msgs.msg.SetServoAngles, self.setServoAnglesCallback )
+            lynxmotion_arm.msg.SetServoAngles, self.setServoAnglesCallback )
             
     #---------------------------------------------------------------------------
     def setServoAnglesCallback( self, request ):

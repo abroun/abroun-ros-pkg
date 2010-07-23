@@ -1,0 +1,13 @@
+<stack>
+  <description brief="gaffa_apps">
+  
+  Simple applications for the Gaffa robot
+  
+  </description>
+  <author>Maintained by Alan Broun</author>
+  <license>BSD</license>  
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/gaffa_apps</url>
+  <depend stack="ros" />
+
+</stack>

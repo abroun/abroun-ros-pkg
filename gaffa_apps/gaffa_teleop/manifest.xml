@@ -1,0 +1,17 @@
+<package>
+  <description brief="gaffa_teleop">
+
+     gaffa_teleop
+
+  </description>
+  <author>Alan Broun</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/gaffa_teleop</url>
+
+  <depend package="rospy" />
+  <depend package="lynxmotion_arm" />
+
+</package>
+
+

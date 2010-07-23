@@ -4,7 +4,7 @@ import roslib
 roslib.load_manifest( 'lynxmotion_arm' )
 import rospy
 
-from lynxmotion_arm.msg import *
+from arm_driver_msgs.msg import *
 
 import time
 import math
@@ -18,12 +18,14 @@ class ROS_SSC32Client():
     def __init__( self, setServoAnglesTopicName = "/setServoAngles" ):
         
         self.setServoAnglesPublisher = rospy.Publisher( setServoAnglesTopicName, 
-            lynxmotion_arm.msg.SetServoAngles )
+            arm_driver_msgs.msg.SetServoAngles )
 
     #---------------------------------------------------------------------------
     def setServoAngles( self, servoAnglesDict, movementSpeed = 0.0 ):
         
-        servoAngles = [ { "servoName" : key, "angle" : servoAngles[ key ] } for key in servoAnglesDict ]
-        self.setServoAnglesPublisher.publish( lynxmotion_arm.msg.SetServoAngles(
+        servoAngles = [ arm_driver_msgs.msg.ServoAngle( 
+            servoName=key, angle=servoAnglesDict[ key ] ) for key in servoAnglesDict ]
+
+        self.setServoAnglesPublisher.publish( arm_driver_msgs.msg.SetServoAngles(
             servoAngles = servoAngles, movementSpeed = movementSpeed ) )
             
