@@ -1,6 +1,7 @@
 # Directories
 bin
 build
+msg_gen
 
 # Files
 *.pyc
