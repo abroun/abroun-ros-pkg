@@ -1,0 +1,8 @@
+<launch>
+
+  <!-- Simulated SSC32 Server -->
+  <node name="ssc32_server" output="screen" pkg="gaffa_gazebo" type="ROS_SSC32Server.py" respawn="false">
+    <rosparam ns="servoConfigData" file="$(find gaffa_bringup)/config/ServoConfig.yaml" command="load" />
+  </node>
+
+</launch>

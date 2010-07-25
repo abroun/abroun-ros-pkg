@@ -23,6 +23,8 @@ import LynxmotionArmDescription
 from lynxmotion_arm.SSC32Driver import SSC32Driver, ServoConfig
 from RoboticArm import DHFrame, RoboticArm
 
+import os
+
 #-------------------------------------------------------------------------------
 class ConfigData( yaml.YAMLObject ):
 
@@ -72,6 +74,9 @@ class MainWindow:
         self.draggingInSideView = False
         
         builder = gtk.Builder()
+        
+        print os.getcwd()
+        
         builder.add_from_file( "GUI/GaffaTeleopGUI.glade" )
         
         self.window = builder.get_object( "winMain" )
@@ -151,11 +156,11 @@ class MainWindow:
             curTime = time.clock()
             if curTime - lastTime > 0.05 and self.chkSendAngles.get_active():
                 servoAnglesDict = {
-                    "base" : self.servoAngles[ 0 ],
-                    "shoulder" : self.servoAngles[ 1 ],
-                    "elbow" : self.servoAngles[ 2 ],
-                    "wrist_bend" : self.servoAngles[ 3 ],
-                    "wrist_rotate" : self.servoAngles[ 4 ],
+                    "base_rotate" : self.servoAngles[ 0 ],
+                    "shoulder_rotate" : self.servoAngles[ 1 ],
+                    "elbow_rotate" : self.servoAngles[ 2 ],
+                    "wrist_rotate" : self.servoAngles[ 3 ],
+                    "gripper_rotate" : self.servoAngles[ 4 ],
                 }
                 self.roboticArm.setJointAngles( servoAnglesDict, math.radians( 2.5 ) )
 

@@ -6,5 +6,8 @@
   <!-- Default Controllers -->
   <include file="$(find gaffa_gazebo)/launch/gaffa_default_controllers.launch" />
 
+  <!-- Simulated SSC32 Server -->
+  <include file="$(find gaffa_gazebo)/launch/simulated_ssc32_server.launch" />
+
 </launch>
 

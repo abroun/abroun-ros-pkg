@@ -20,7 +20,7 @@
   </joint>-->
   
   <property name="M_PI" value="3.1415926535897931" />
-  <property name="BASE_MASS" value="10" />
+  <property name="BASE_MASS" value="100" />
   <property name="BASE_LENGTH" value="0.3" />
   <property name="BASE_WIDTH" value="0.15" />
   <property name="BASE_HEIGHT" value="0.018" />
@@ -33,7 +33,7 @@
   
   <property name="UPPER_ARM_MASS" value="0.1" />
   <property name="UPPER_ARM_LENGTH" value="0.154" />
-  <property name="UPPER_ARM_WIDTH" value="0.053" />
+  <property name="UPPER_ARM_WIDTH" value="0.052" />
   <property name="UPPER_ARM_HEIGHT" value="0.0244" />
   
   <!-- Mass includes both elbow and wrist servos -->
@@ -45,7 +45,7 @@
   <!-- Mass includes gripper rotate servo -->
   <property name="WRIST_MASS" value="0.065" /> 
   <property name="WRIST_LENGTH" value="0.0346" />
-  <property name="WRIST_WIDTH" value="0.053" />
+  <property name="WRIST_WIDTH" value="0.052" />
   <property name="WRIST_HEIGHT" value="0.0244" />
   
   <!-- Mass includes gripper 'grip' servo -->
@@ -129,7 +129,7 @@
   <!-- Shoulder and Upper arm -->
   <joint name="shoulder_rotate_joint" type="revolute" >
     <axis xyz="0 0 1" />
-    <limit upper="${M_PI/2}" lower="0" effort="100" velocity="5" />
+    <limit upper="${3*M_PI/4}" lower="0" effort="100" velocity="5" />
     <parent link="base_rotate_link" />
     <origin xyz="0 0 ${SHOULDER_HEIGHT - BASE_ROTATE_HEIGHT/2}" rpy="${M_PI/2} 0 0" />
     <child link="upper_arm_link" />
@@ -203,9 +203,9 @@
   <!-- Wrist -->
   <joint name="wrist_rotate_joint" type="revolute" >
     <axis xyz="0 0 1" />
-    <limit upper="${M_PI/2}" lower="${-M_PI/2}" effort="100" velocity="5" />
+    <limit upper="${M_PI}" lower="${0}" effort="100" velocity="5" />
     <parent link="fore_arm_link" />
-    <origin xyz="${FORE_ARM_LENGTH} 0 0.0" rpy="0 0 0" />
+    <origin xyz="${FORE_ARM_LENGTH} 0 0.0" rpy="0 0 ${-M_PI/2}" />
     <child link="wrist_link" />
   </joint>
   <link name="wrist_link">
