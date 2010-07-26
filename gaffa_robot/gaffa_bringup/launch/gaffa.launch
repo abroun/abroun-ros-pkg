@@ -5,4 +5,9 @@
     <rosparam ns="servoConfigData" file="$(find gaffa_bringup)/config/ServoConfig.yaml" command="load" />
   </node>
 
+  <!-- Webcam -->
+  <node name="camera" output="screen" pkg="usb_cam" type="usb_cam_node" respawn="false">
+    <param name="~pixel_format" value="mjpeg" />
+  </node>
+
 </launch>

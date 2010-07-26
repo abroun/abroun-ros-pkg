@@ -15,6 +15,7 @@
   <depend package="ivcon"/>
   <depend package="urdf" />
   <depend package="xacro" />
+  <depend package="gazebo_plugins" />
 
 </package>
 

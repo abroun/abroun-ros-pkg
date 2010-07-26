@@ -347,6 +347,43 @@
     <turnGravityOff>false</turnGravityOff>
     <selfCollide>true</selfCollide>
   </gazebo>
+  
+  <!-- Gripper camera -->
+  <joint name="gripper_camera_joint" type="fixed" >
+    <axis xyz="1 0 0" />
+    <limit upper="0" lower="0" effort="100" velocity="5" />
+    <parent link="gripper_base_link" />
+    <origin xyz="0 0 ${GRIPPER_BASE_LENGTH + 0.02}" rpy="0 ${-M_PI/2} ${-M_PI/2}" />
+    <child link="gripper_camera_link" />
+  </joint>
+  <link name="gripper_camera_link">
+    <inertial >
+      <mass value="0.0001" />
+      <origin xyz="${GRIPPER_FINGER_LENGTH/2} 0 0" /> 
+      <inertia ixx="${GRIPPER_FINGER_MASS*(GRIPPER_FINGER_LENGTH*GRIPPER_FINGER_LENGTH + GRIPPER_FINGER_HEIGHT*GRIPPER_FINGER_HEIGHT)/12.0}" 
+               ixy="0" ixz="0" 
+               iyy="${GRIPPER_FINGER_MASS*(GRIPPER_FINGER_LENGTH*GRIPPER_FINGER_LENGTH + GRIPPER_FINGER_WIDTH*GRIPPER_FINGER_WIDTH)/12.0}"
+               iyz="0" 
+               izz="${GRIPPER_FINGER_MASS*(GRIPPER_FINGER_WIDTH*GRIPPER_FINGER_WIDTH + GRIPPER_FINGER_HEIGHT*GRIPPER_FINGER_HEIGHT)/12.0}" />
+    </inertial>
+    <visual >
+      <origin xyz="0 0 ${GRIPPER_FINGER_LENGTH/2}" rpy="0 0 0" />
+      <geometry name="gripper_finger_visual_geom">
+        <box size="${GRIPPER_FINGER_WIDTH} ${GRIPPER_FINGER_HEIGHT} ${GRIPPER_FINGER_LENGTH}" />
+      </geometry>
+    </visual>
+    <collision >
+      <origin xyz="0 0 ${GRIPPER_FINGER_LENGTH/2}" rpy="0 0 0" />
+      <geometry name="gripper_finger_collision_geom">
+        <box size="${GRIPPER_FINGER_WIDTH} ${GRIPPER_FINGER_HEIGHT} ${GRIPPER_FINGER_LENGTH}" />
+      </geometry>
+    </collision>
+  </link>
+  <gazebo reference="gripper_camera_link">
+    <material>Gazebo/Blue</material>
+    <turnGravityOff>false</turnGravityOff>
+    <selfCollide>false</selfCollide>
+  </gazebo>
 
   <gazebo>
       <controller:gazebo_ros_time name="gazebo_ros_time" plugin="libgazebo_ros_time.so">
@@ -372,6 +409,28 @@
           <interface:position name="p3d_link1_position"/>
       </controller:gazebo_ros_p3d>-->
   </gazebo>
+  
+  <!-- Camera -->
+  <gazebo reference="gripper_camera_link">
+      <sensor:camera name="gripper_camera_sensor">
+        <imageSize>320 240</imageSize>
+        <imageFormat>L8</imageFormat>
+        <hfov>45</hfov>
+        <nearClip>0.01</nearClip>
+        <farClip>100</farClip>
+        <updateRate>20.0</updateRate>
+        <controller:gazebo_ros_camera name="gripper_camera_controller" plugin="libgazebo_ros_camera.so">
+          <alwaysOn>true</alwaysOn>
+          <updateRate>20.0</updateRate>
+          <imageTopicName>gripper_cam/image</imageTopicName>
+          <cameraInfoTopicName>gripper_cam/info</cameraInfoTopicName>
+          <frameName>gripper_camera</frameName>
+          <interface:camera name="gripper_camera_iface" />
+        </controller:gazebo_ros_camera>
+      </sensor:camera>
+      <!--<turnGravityOff>true</turnGravityOff>
+      <material>PR2/Blue</material>-->
+    </gazebo>
   
   <!-- mechanism controls -->
   <transmission type="pr2_mechanism_model/SimpleTransmission" name="base_rotate_trans">
