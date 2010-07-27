@@ -1,0 +1,3 @@
+pyusb:
+  ubuntu: python-usb
+  debian: python-usb

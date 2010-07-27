@@ -23,8 +23,6 @@ import LynxmotionArmDescription
 from lynxmotion_arm.SSC32Driver import SSC32Driver, ServoConfig
 from RoboticArm import DHFrame, RoboticArm
 
-import os
-
 #-------------------------------------------------------------------------------
 class ConfigData( yaml.YAMLObject ):
 
@@ -50,8 +48,11 @@ class MainWindow:
     
         self.servoAngles = [0.0]*self.NUM_SERVOS
 
-        if os.path.exists( self.CONFIG_FILENAME ):
-            configFile = file( self.CONFIG_FILENAME, "r" )
+        scriptPath = os.path.dirname( __file__ )
+        self.fullConfigFilename = scriptPath + "/" + self.CONFIG_FILENAME
+        
+        if os.path.exists( self.fullConfigFilename ):
+            configFile = file( self.fullConfigFilename, "r" )
             configData = yaml.load( configFile )
             servoConfigList = configData.servoConfigList
             self.savedServoAngles = configData.servoAngles
@@ -74,10 +75,7 @@ class MainWindow:
         self.draggingInSideView = False
         
         builder = gtk.Builder()
-        
-        print os.getcwd()
-        
-        builder.add_from_file( "GUI/GaffaTeleopGUI.glade" )
+        builder.add_from_file( scriptPath + "/GUI/GaffaTeleopGUI.glade" )
         
         self.window = builder.get_object( "winMain" )
         
@@ -447,7 +445,7 @@ class MainWindow:
 
     #---------------------------------------------------------------------------
     def onBtnSaveConfigClicked( self, widget, data = None ):
-        saveFile = file( self.CONFIG_FILENAME, "w" )
+        saveFile = file( self.fullConfigFilename, "w" )
         servoConfigList = [self.roboticArm.GetServoConfig( jointIdx ) for jointIdx in range( self.roboticArm.numJoints )]
         configData = ConfigData( servoConfigList, self.servoAngles )
         yaml.dump( configData, saveFile )

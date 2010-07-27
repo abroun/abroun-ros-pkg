@@ -1,31 +1,31 @@
 base_rotate: {
-  channelIdx: 1,
-  endPulseWidth: 530,
+  channelIdx: 1, 
+  endPulseWidth: 530, 
   maxAngle: 1.5707963267948966,
   minAngle: -1.5707963267948966,
-  startPulseWidth: 2390 }
+  startPulseWidth: 2250 }
 shoulder_rotate: {
   channelIdx: 2,
-  endPulseWidth: 1890,
+  endPulseWidth: 1920, 
   maxAngle: 2.3561944901923448,
-  minAngle: 0.0,
-  startPulseWidth: 730 }
+  minAngle: 0.034906585039886591, 
+  startPulseWidth: 700 }
 elbow_rotate: {
   channelIdx: 3,
-  endPulseWidth: 950,
-  maxAngle: 0.0,
-  minAngle: -2.3561944901923448,
-  startPulseWidth: 2340 }
+  endPulseWidth: 570, 
+  maxAngle: 0.0, 
+  minAngle: -2.748893571891069,
+  startPulseWidth: 2160 }
 wrist_rotate: {
   channelIdx: 4,
-  endPulseWidth: 2390,
+  endPulseWidth: 2430, 
   maxAngle: 3.1415926535897931,
-  minAngle: 0.0,
-  startPulseWidth: 620 }
+  minAngle: 0.0, 
+  startPulseWidth: 630 }
 gripper_rotate: {
   channelIdx: 5,
-  endPulseWidth: 2410,
+  endPulseWidth: 2500, 
   maxAngle: 1.5707963267948966,
-  minAngle: -1.5707963267948966,
-  startPulseWidth: 610 }
+  minAngle: -1.5707963267948966, 
+  startPulseWidth: 720 }
 
