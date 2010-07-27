@@ -47,11 +47,16 @@ class RoboticArm:
     # then it isn't sent.
     def setJointAngles( self, jointAnglesDict, movementSpeed = 0.0 ):
             
-        self.jointAngles[ 0 ] = jointAnglesDict[ "base_rotate" ]
-        self.jointAngles[ 1 ] = jointAnglesDict[ "shoulder_rotate" ]
-        self.jointAngles[ 2 ] = jointAnglesDict[ "elbow_rotate" ]
-        self.jointAngles[ 3 ] = jointAnglesDict[ "wrist_rotate" ]
-        self.jointAngles[ 4 ] = jointAnglesDict[ "gripper_rotate" ]
+        if "base_rotate" in jointAnglesDict:
+            self.jointAngles[ 0 ] = jointAnglesDict[ "base_rotate" ]
+        if "shoulder_rotate" in jointAnglesDict:
+            self.jointAngles[ 1 ] = jointAnglesDict[ "shoulder_rotate" ]
+        if "elbow_rotate" in jointAnglesDict:
+            self.jointAngles[ 2 ] = jointAnglesDict[ "elbow_rotate" ]
+        if "wrist_rotate" in jointAnglesDict:
+            self.jointAngles[ 3 ] = jointAnglesDict[ "wrist_rotate" ]
+        if "gripper_rotate" in jointAnglesDict:
+            self.jointAngles[ 4 ] = jointAnglesDict[ "gripper_rotate" ]
         
         self.rosSSC32Client.setServoAngles( jointAnglesDict, movementSpeed )
 

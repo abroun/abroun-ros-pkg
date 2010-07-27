@@ -1,0 +1,20 @@
+<package>
+  <description brief="gripper_detector">
+
+     Module that uses active vision to locate a gripper in the scene by 
+     moving the gripper with a known motion
+
+  </description>
+  <author>Alan Broun</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/gripper_detector</url>
+  
+  <depend package="rospy" />
+  <depend package="lynxmotion_arm" />
+  <depend package="sensor_msgs" />
+  <depend package="gaffa_teleop" /> <!-- TODO: Remove this dependancy -->
+
+</package>
+
+
