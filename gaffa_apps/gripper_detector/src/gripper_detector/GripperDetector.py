@@ -12,6 +12,7 @@ import time
 
 import numpy as np
 import gaffa_teleop.Homog3D
+import cv
 
 import yaml
 import pygtk
@@ -23,6 +24,18 @@ import gaffa_teleop.LynxmotionArmDescription
 from lynxmotion_arm.SSC32Driver import ServoConfig
 from gaffa_teleop.RoboticArm import DHFrame, RoboticArm
 import sensor_msgs.msg
+
+def printTiming(func):
+    def wrapper(*arg):
+    
+        t1 = time.time()
+        res = func(*arg)
+        t2 = time.time()
+        
+        print '%s took %0.3f ms' % (func.func_name, (t2-t1)*1000.0)
+        return res
+
+    return wrapper
 
 #-------------------------------------------------------------------------------
 def getArmServoConfig():
@@ -40,6 +53,11 @@ def getArmServoConfig():
 
 #-------------------------------------------------------------------------------
 class MainWindow:
+    
+    OPTICAL_FLOW_BLOCK_WIDTH = 8
+    OPTICAL_FLOW_BLOCK_HEIGHT = 8
+    OPTICAL_FLOW_RANGE_WIDTH = 4    # Range to look outside of a block for motion
+    OPTICAL_FLOW_RANGE_HEIGHT = 4
  
     #---------------------------------------------------------------------------
     def __init__( self ):
@@ -47,6 +65,9 @@ class MainWindow:
         scriptPath = os.path.dirname( __file__ )
         self.cameraImagePixBuf = None
         self.servoConfigDict = getArmServoConfig()
+        self.lastImageGray = None
+        self.opticalFlowX = None
+        self.opticalFlowY = None
             
         # Connect to the robot via ROS
         #rospy.init_node( 'GripperDetector', anonymous=True )
@@ -86,23 +107,69 @@ class MainWindow:
         gtk.main()
         
     #---------------------------------------------------------------------------
-    def cameraImageCallback( self, image ):
+    def createOpticalFlowStorage( self ):
         
-        if image.encoding == "rgb8":
+        if self.lastImageGray == None:
+            raise Exception( "No image to measure for optical flow" )
+        
+        storageWidth = (self.lastImageGray.width - self.OPTICAL_FLOW_BLOCK_WIDTH)/self.OPTICAL_FLOW_BLOCK_WIDTH
+        storageHeight = (self.lastImageGray.height - self.OPTICAL_FLOW_BLOCK_HEIGHT)/self.OPTICAL_FLOW_BLOCK_HEIGHT
+        
+        if self.opticalFlowX == None \
+            or storageWidth != self.opticalFlowX.width \
+            or storageHeight != self.opticalFlowX.height:
+                
+            self.opticalFlowX = cv.CreateMat( storageHeight, storageWidth, cv.CV_32FC1 )
+
+        if self.opticalFlowY == None \
+            or storageWidth != self.opticalFlowY.width \
+            or storageHeight != self.opticalFlowY.height:
+                
+            self.opticalFlowY = cv.CreateMat( storageHeight, storageWidth, cv.CV_32FC1 )
+        
+    #---------------------------------------------------------------------------
+    #@printTiming
+    def calcOpticalFlow( self, curImageGray ):
+        if self.lastImageGray != None:
+                
+            self.createOpticalFlowStorage()
+            
+            cv.CalcOpticalFlowBM( self.lastImageGray, curImageGray, 
+                ( self.OPTICAL_FLOW_BLOCK_WIDTH, self.OPTICAL_FLOW_BLOCK_HEIGHT ),
+                ( self.OPTICAL_FLOW_BLOCK_WIDTH, self.OPTICAL_FLOW_BLOCK_HEIGHT ),
+                ( self.OPTICAL_FLOW_RANGE_WIDTH, self.OPTICAL_FLOW_RANGE_HEIGHT ),
+                0, self.opticalFlowX, self.opticalFlowY )
+            
+        # Save the current image
+        self.lastImageGray = curImageGray
+        
+    #---------------------------------------------------------------------------
+    def cameraImageCallback( self, rosImage ):
+        
+        if rosImage.encoding == "rgb8":
+            
+            # Create an OpenCV image to process the data
+            curImageRGB = cv.CreateImageHeader( ( rosImage.width, rosImage.height ), cv.IPL_DEPTH_8U, 3 )
+            cv.SetData( curImageRGB, rosImage.data, rosImage.step )
+            curImageGray = cv.CreateImage( ( rosImage.width, rosImage.height ), cv.IPL_DEPTH_8U, 1 )
+            cv.CvtColor( curImageRGB, curImageGray, cv.CV_RGB2GRAY )
+            
+            # Look for optical flow between this image and the last one
+            self.calcOpticalFlow( curImageGray )
             
             # Display the image
             self.cameraImagePixBuf = gtk.gdk.pixbuf_new_from_data( 
-                image.data, 
+                rosImage.data, 
                 gtk.gdk.COLORSPACE_RGB,
                 False,
                 8,
-                image.width,
-                image.height,
-                image.step )
+                rosImage.width,
+                rosImage.height,
+                rosImage.step )
 
             # Resize the drawing area if necessary
-            if self.dwgCameraImage.get_size_request() != ( image.width, image.height ):
-                self.dwgCameraImage.set_size_request( image.width, image.height )
+            if self.dwgCameraImage.get_size_request() != ( rosImage.width, rosImage.height ):
+                self.dwgCameraImage.set_size_request( rosImage.width, rosImage.height )
 
             self.dwgCameraImage.queue_draw()
 
@@ -155,6 +222,46 @@ class MainWindow:
             widget.window.draw_pixbuf( widget.get_style().fg_gc[ gtk.STATE_NORMAL ],
                 self.cameraImagePixBuf, srcX, srcY, 
                 imgRect.x, imgRect.y, imgRect.width, imgRect.height )
+                
+            # Draw the optical flow if it's available
+            if self.opticalFlowX != None and self.opticalFlowY != None:
+            
+                graphicsContext = widget.window.new_gc()
+                graphicsContext.set_rgb_fg_color( gtk.gdk.Color( 0, 65535, 0 ) )
+                
+                blockCentreY = self.OPTICAL_FLOW_BLOCK_HEIGHT / 2
+                for y in range( self.opticalFlowX.height ):
+                
+                    blockCentreX = self.OPTICAL_FLOW_BLOCK_WIDTH / 2
+                    for x in range( self.opticalFlowX.width ):
+                        
+                        endX = blockCentreX + cv.Get2D( self.opticalFlowX, y, x )[ 0 ]
+                        endY = blockCentreY + cv.Get2D( self.opticalFlowY, y, x )[ 0 ]
+                        
+                        if endY < blockCentreY:
+                            # Up is red
+                            graphicsContext.set_rgb_fg_color( gtk.gdk.Color( 65535, 0, 0 ) )
+                        elif endY > blockCentreY:
+                            # Down is blue
+                            graphicsContext.set_rgb_fg_color( gtk.gdk.Color( 0, 0, 65535 ) )
+                        else:
+                            # Static is green
+                            graphicsContext.set_rgb_fg_color( gtk.gdk.Color( 0, 65535, 0 ) )
+                            
+                        
+                        widget.window.draw_line( graphicsContext, 
+                            int( blockCentreX ), int( blockCentreY ),
+                            int( endX ), int( endY ) )
+                        
+                        blockCentreX += self.OPTICAL_FLOW_BLOCK_WIDTH
+                        
+                    blockCentreY += self.OPTICAL_FLOW_BLOCK_HEIGHT
+                
+                
+                
+            
+            
+            
 
     #---------------------------------------------------------------------------
     def getImageRectangleInWidget( self, widget, imageWidth, imageHeight ):
