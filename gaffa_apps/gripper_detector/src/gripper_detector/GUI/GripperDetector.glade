@@ -44,7 +44,16 @@
               </packing>
             </child>
             <child>
-              <placeholder/>
+              <object class="GtkButton" id="btnWaveGripper">
+                <property name="label" translatable="yes">Wave Gripper</property>
+                <property name="visible">True</property>
+                <property name="can_focus">True</property>
+                <property name="receives_default">True</property>
+                <signal name="clicked" handler="onBtnWaveGripperClicked"/>
+              </object>
+              <packing>
+                <property name="position">2</property>
+              </packing>
             </child>
           </object>
           <packing>

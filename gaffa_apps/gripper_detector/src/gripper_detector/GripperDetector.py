@@ -54,10 +54,14 @@ def getArmServoConfig():
 #-------------------------------------------------------------------------------
 class MainWindow:
     
-    OPTICAL_FLOW_BLOCK_WIDTH = 8
-    OPTICAL_FLOW_BLOCK_HEIGHT = 8
-    OPTICAL_FLOW_RANGE_WIDTH = 4    # Range to look outside of a block for motion
-    OPTICAL_FLOW_RANGE_HEIGHT = 4
+    OPTICAL_FLOW_BLOCK_WIDTH = 16
+    OPTICAL_FLOW_BLOCK_HEIGHT = 16
+    OPTICAL_FLOW_RANGE_WIDTH = 8    # Range to look outside of a block for motion
+    OPTICAL_FLOW_RANGE_HEIGHT = 8
+    
+    GRIPPER_WAVE_FREQUENCY = 1.0    # Waves per second
+    GRIPPER_NUM_WAVES = 3.0
+    GRIPPER_WAVE_AMPLITUDE = math.radians( 20.0 )
  
     #---------------------------------------------------------------------------
     def __init__( self ):
@@ -68,6 +72,10 @@ class MainWindow:
         self.lastImageGray = None
         self.opticalFlowX = None
         self.opticalFlowY = None
+        self.wavingGripper = False
+        self.gripperWaveStartTime = None
+        
+        self.wristAngle = 0.0
             
         # Connect to the robot via ROS
         #rospy.init_node( 'GripperDetector', anonymous=True )
@@ -128,7 +136,7 @@ class MainWindow:
             self.opticalFlowY = cv.CreateMat( storageHeight, storageWidth, cv.CV_32FC1 )
         
     #---------------------------------------------------------------------------
-    #@printTiming
+    @printTiming
     def calcOpticalFlow( self, curImageGray ):
         if self.lastImageGray != None:
                 
@@ -187,6 +195,8 @@ class MainWindow:
             "gripper_rotate" : -0.0004890796739715704
         }
         
+        self.wristAngle = servoAnglesDict[ "wrist_rotate" ]
+        
         self.roboticArm.setJointAngles( servoAnglesDict, math.radians( 2.5 ) )
         
     #---------------------------------------------------------------------------
@@ -200,8 +210,17 @@ class MainWindow:
             "gripper_rotate" : -0.0004890796739715704
         }
         
-        self.roboticArm.setJointAngles( servoAnglesDict, math.radians( 2.5 ) )
+        self.wristAngle = servoAnglesDict[ "wrist_rotate" ]
         
+        self.roboticArm.setJointAngles( servoAnglesDict, math.radians( 2.5 ) )
+    
+    #---------------------------------------------------------------------------
+    def onBtnWaveGripperClicked( self, widget, data = None ):
+        
+        if self.wavingGripper == False:
+            self.gripperWaveStartTime = time.clock()
+            self.wavingGripper = True
+      
     #---------------------------------------------------------------------------
     def onDwgCameraImageExposeEvent( self, widget, data = None ):
         
@@ -255,13 +274,7 @@ class MainWindow:
                         
                         blockCentreX += self.OPTICAL_FLOW_BLOCK_WIDTH
                         
-                    blockCentreY += self.OPTICAL_FLOW_BLOCK_HEIGHT
-                
-                
-                
-            
-            
-            
+                    blockCentreY += self.OPTICAL_FLOW_BLOCK_HEIGHT            
 
     #---------------------------------------------------------------------------
     def getImageRectangleInWidget( self, widget, imageWidth, imageHeight ):
@@ -284,22 +297,42 @@ class MainWindow:
     #---------------------------------------------------------------------------
     def update( self ):
 
+        UPDATE_FREQUENCY = 30.0    # Updates in Hz
+
         lastTime = time.clock()
 
         while 1:
             
             curTime = time.clock()
-            #if curTime - lastTime > 0.05 and self.chkSendAngles.get_active():
-                #servoAnglesDict = {
-                    #"base_rotate" : self.servoAngles[ 0 ],
-                    #"shoulder_rotate" : self.servoAngles[ 1 ],
-                    #"elbow_rotate" : self.servoAngles[ 2 ],
-                    #"wrist_rotate" : self.servoAngles[ 3 ],
-                    #"gripper_rotate" : self.servoAngles[ 4 ],
-                #}
-                #self.roboticArm.setJointAngles( servoAnglesDict, math.radians( 2.5 ) )
+            
+            if curTime - lastTime >= 1.0 / UPDATE_FREQUENCY:
+            
+                # Update the wave if active
+                if self.wavingGripper:
+                    
+                    waveTime = curTime - self.gripperWaveStartTime
+                    totalWaveTime = self.GRIPPER_NUM_WAVES / self.GRIPPER_WAVE_FREQUENCY
+                    waveFinished = False
+                    
+                    print waveTime, totalWaveTime
+                    if waveTime >= totalWaveTime:
+                        
+                        waveTime = totalWaveTime
+                        waveFinished = True
+                        
+                    # Work out the current displacement from the initial position
+                    displacement = self.GRIPPER_WAVE_AMPLITUDE \
+                        * math.sin( waveTime*self.GRIPPER_WAVE_FREQUENCY*2.0*math.pi )
+                    
+                    
+                    servoAnglesDict = { "wrist_rotate" : self.wristAngle + displacement }
+                    
+                    self.roboticArm.setJointAngles( servoAnglesDict )
+                    if waveFinished:
+                        self.wavingGripper = False
 
-                #lastTime = curTime
+                # Save the time
+                lastTime = curTime
                 
             yield True
             
