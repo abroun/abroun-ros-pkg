@@ -1,0 +1,11 @@
+<stack>
+  <description brief="abroun_libs">
+    Home grown libs
+  </description>
+  <author>Maintained by Alan Broun</author>
+  <license>BSD</license>  
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/abroun_libs</url>
+  <depend stack="ros" />
+
+</stack>

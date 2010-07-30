@@ -1,0 +1,14 @@
+<package>
+  <description brief="abroun_gtk_gui">
+
+     Useful widgets and helper routines for programming with PyGtk
+
+  </description>
+  <author>Alan Broun</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/abroun_gtk_gui</url>
+
+</package>
+
+

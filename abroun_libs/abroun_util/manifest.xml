@@ -1,0 +1,14 @@
+<package>
+  <description brief="abroun_util">
+
+     Dumping ground for useful routines until sufficient mass is reached and a new library is formed
+
+  </description>
+  <author>Alan Broun</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/abroun_util</url>
+
+</package>
+
+
