@@ -2,6 +2,7 @@
 bin
 build
 msg_gen
+test_data
 
 # Files
 *.pyc

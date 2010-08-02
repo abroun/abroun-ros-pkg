@@ -4,6 +4,8 @@
 import roslib
 roslib.load_manifest( 'gripper_detector' )
 import rospy
+from ros import rosrecord
+
 
 import sys
 import math
@@ -11,7 +13,6 @@ import os.path
 import time
 
 import numpy as np
-import gaffa_teleop.Homog3D
 import cv
 
 import yaml
@@ -20,10 +21,13 @@ pygtk.require('2.0')
 import gtk
 import gobject
 
-import gaffa_teleop.LynxmotionArmDescription
-from lynxmotion_arm.SSC32Driver import ServoConfig
-from gaffa_teleop.RoboticArm import DHFrame, RoboticArm
-import sensor_msgs.msg
+import matplotlib
+matplotlib.use('GTK')
+
+from matplotlib.figure import Figure
+from matplotlib.axes import Subplot
+from matplotlib.backends.backend_gtkagg import FigureCanvasGTKAgg as FigureCanvas
+from matplotlib.backends.backend_gtkagg import NavigationToolbar2GTKAgg as NavigationToolbar
 
 def printTiming(func):
     def wrapper(*arg):
@@ -38,20 +42,6 @@ def printTiming(func):
     return wrapper
 
 #-------------------------------------------------------------------------------
-def getArmServoConfig():
-    
-    # Pulls the servo configuration for the arm from the parameter server
-    # and returns it as a dictionary of ServoConfigs
-    servoConfigData = rospy.get_param( "/ssc32_server/servoConfigData" )
-    
-    # Move the data into servo config objects
-    servoConfigDict = {}
-    for servoName in servoConfigData:
-        servoConfigDict[ servoName ] = ServoConfig( **servoConfigData[ servoName ] )
-        
-    return servoConfigDict
-
-#-------------------------------------------------------------------------------
 class MainWindow:
     
     OPTICAL_FLOW_BLOCK_WIDTH = 16
@@ -59,40 +49,97 @@ class MainWindow:
     OPTICAL_FLOW_RANGE_WIDTH = 8    # Range to look outside of a block for motion
     OPTICAL_FLOW_RANGE_HEIGHT = 8
     
+    TEST_X = 17 #17
+    TEST_Y = 8 #8
+    
     GRIPPER_WAVE_FREQUENCY = 1.0    # Waves per second
     GRIPPER_NUM_WAVES = 3.0
     GRIPPER_WAVE_AMPLITUDE = math.radians( 20.0 )
  
     #---------------------------------------------------------------------------
-    def __init__( self ):
+    def __init__( self, bagFilename ):
     
         scriptPath = os.path.dirname( __file__ )
         self.cameraImagePixBuf = None
-        #self.servoConfigDict = getArmServoConfig()
+        self.bagFilename = bagFilename
         self.lastImageGray = None
         self.opticalFlowX = None
         self.opticalFlowY = None
         self.wavingGripper = False
         self.gripperWaveStartTime = None
         
-        self.wristAngle = 0.0
-            
-        # Connect to the robot via ROS
-        rospy.init_node( 'GripperDetector', anonymous=True )
+        startTime = None
+        servoAngleTimes = []
+        servoAngleData = []
+        imageTimes = []
+        opticalFlowDataX = []
+        opticalFlowDataY = []
         
-        # TODO: Move arm to all dictionary
-        #servoConfigList = [ self.servoConfigDict[ servoName ] for servoName in self.servoConfigDict ]
-        #self.roboticArm = RoboticArm( gaffa_teleop.LynxmotionArmDescription.ARM_DH_PROXIMAL, servoConfigList )
+        numServoAngleReadings = 0
+        servoAngleMean = 0
         
-        self.cameraImageTopic = rospy.Subscriber( "/camera/image", 
-            sensor_msgs.msg.Image, self.cameraImageCallback )
+        for topic, msg, t in rosrecord.logplayer( bagFilename ):
+            if startTime == None:
+                startTime = t
+                
+            bagTime = t - startTime
+                
+            if msg._type == "arm_driver_msgs/SetServoAngles":
+                servoAngleTimes.append( bagTime.to_seconds() )
+                
+                servoAngle = msg.servoAngles[ 0 ].angle
+                servoAngleData.append( servoAngle )
+                
+                numServoAngleReadings += 1
+                servoAngleMean = servoAngleMean + (servoAngle - servoAngleMean)/(numServoAngleReadings)
+                
+            elif msg._type == "sensor_msgs/Image":
+                
+                self.processCameraImage( msg )
+                
+                if self.opticalFlowX != None and self.opticalFlowY != None:
+                
+                    imageTimes.append( bagTime.to_seconds() )
+                    
+                    opticalFlowDataX.append( cv.Get2D( self.opticalFlowX, self.TEST_Y, self.TEST_X )[ 0 ] 
+                        / float( self.OPTICAL_FLOW_RANGE_WIDTH ) )
+                    opticalFlowDataY.append( cv.Get2D( self.opticalFlowY, self.TEST_Y, self.TEST_X )[ 0 ]
+                        / float( self.OPTICAL_FLOW_RANGE_HEIGHT ) )
+
+        servoAngleData = [ angle - servoAngleMean for angle in servoAngleData ]
         
+        # Create the matplotlib graph
+        self.figure = Figure( figsize=(8,6), dpi=72 )
+        self.axisX = self.figure.add_subplot( 211 )
+        self.axisY = self.figure.add_subplot( 212 )
+        
+        print servoAngleTimes
+        self.axisX.plot( servoAngleTimes, servoAngleData )
+        self.axisX.plot( imageTimes, opticalFlowDataX )
+        self.axisY.plot( servoAngleTimes, servoAngleData )
+        self.axisY.plot( imageTimes, opticalFlowDataY )
+
+        self.canvas = FigureCanvas( self.figure ) # a gtk.DrawingArea
+        self.canvas.show()
+                
         # Setup the GUI        
         builder = gtk.Builder()
-        builder.add_from_file( scriptPath + "/GUI/GripperDetector.glade" )
+        builder.add_from_file( scriptPath + "/GUI/OpticalFlowExplorer.glade" )
         
         self.dwgCameraImage = builder.get_object( "dwgCameraImage" )
         self.window = builder.get_object( "winMain" )
+        self.vboxMain = builder.get_object( "vboxMain" )
+        self.hboxWorkArea = builder.get_object( "hboxWorkArea" )
+        
+        self.hboxWorkArea.pack_start( self.canvas, True, True )
+        self.hboxWorkArea.show()
+        
+        # Navigation toolbar
+        self.navToolbar = NavigationToolbar( self.canvas, self.window )
+        self.navToolbar.lastDir = '/var/tmp/'
+        self.vboxMain.pack_start( self.navToolbar, expand=False, fill=False )
+        self.navToolbar.show()
+        self.vboxMain.show()
         
         builder.connect_signals( self )
                
@@ -149,7 +196,7 @@ class MainWindow:
         self.lastImageGray = curImageGray
         
     #---------------------------------------------------------------------------
-    def cameraImageCallback( self, rosImage ):
+    def processCameraImage( self, rosImage ):
         
         if rosImage.encoding == "rgb8":
             
@@ -162,62 +209,25 @@ class MainWindow:
             # Look for optical flow between this image and the last one
             self.calcOpticalFlow( curImageGray )
             
-            # Display the image
-            self.cameraImagePixBuf = gtk.gdk.pixbuf_new_from_data( 
-                rosImage.data, 
-                gtk.gdk.COLORSPACE_RGB,
-                False,
-                8,
-                rosImage.width,
-                rosImage.height,
-                rosImage.step )
+            ## Display the image
+            #self.cameraImagePixBuf = gtk.gdk.pixbuf_new_from_data( 
+                #rosImage.data, 
+                #gtk.gdk.COLORSPACE_RGB,
+                #False,
+                #8,
+                #rosImage.width,
+                #rosImage.height,
+                #rosImage.step )
 
-            # Resize the drawing area if necessary
-            if self.dwgCameraImage.get_size_request() != ( rosImage.width, rosImage.height ):
-                self.dwgCameraImage.set_size_request( rosImage.width, rosImage.height )
+            ## Resize the drawing area if necessary
+            #if self.dwgCameraImage.get_size_request() != ( rosImage.width, rosImage.height ):
+                #self.dwgCameraImage.set_size_request( rosImage.width, rosImage.height )
 
-            self.dwgCameraImage.queue_draw()
+            #self.dwgCameraImage.queue_draw()
 
         else:
             rospy.logerr( "Unhandled image encoding - " + image.encoding )
         
-    #---------------------------------------------------------------------------
-    def onBtnGotoSafePosClicked( self, widget, data = None ):
-        
-        servoAnglesDict = {
-            "base_rotate" : 0.02389963168290073, 
-            "shoulder_rotate" : 2.3561944901923448, 
-            "elbow_rotate" : -2.748893571891069, 
-            "wrist_rotate" : 1.9583014768641922,
-            "gripper_rotate" : -0.0004890796739715704
-        }
-        
-        self.wristAngle = servoAnglesDict[ "wrist_rotate" ]
-        
-        self.roboticArm.setJointAngles( servoAnglesDict, math.radians( 2.5 ) )
-        
-    #---------------------------------------------------------------------------
-    def onBtnGotoExperimentPosClicked( self, widget, data = None ):
-  
-        servoAnglesDict = {
-            "base_rotate" : 0.43528090983473017, 
-            "shoulder_rotate" : 1.8248153311815414, 
-            "elbow_rotate" : -2.0368307791722984, 
-            "wrist_rotate" : 1.2301417017068466,
-            "gripper_rotate" : -0.0004890796739715704
-        }
-        
-        self.wristAngle = servoAnglesDict[ "wrist_rotate" ]
-        
-        self.roboticArm.setJointAngles( servoAnglesDict, math.radians( 2.5 ) )
-    
-    #---------------------------------------------------------------------------
-    def onBtnWaveGripperClicked( self, widget, data = None ):
-        
-        if self.wavingGripper == False:
-            self.gripperWaveStartTime = time.clock()
-            self.wavingGripper = True
-      
     #---------------------------------------------------------------------------
     def onDwgCameraImageExposeEvent( self, widget, data = None ):
         
@@ -304,29 +314,29 @@ class MainWindow:
             
             if curTime - lastTime >= 1.0 / UPDATE_FREQUENCY:
             
-                # Update the wave if active
-                if self.wavingGripper:
+                ## Update the wave if active
+                #if self.wavingGripper:
                     
-                    waveTime = curTime - self.gripperWaveStartTime
-                    totalWaveTime = self.GRIPPER_NUM_WAVES / self.GRIPPER_WAVE_FREQUENCY
-                    waveFinished = False
+                    #waveTime = curTime - self.gripperWaveStartTime
+                    #totalWaveTime = self.GRIPPER_NUM_WAVES / self.GRIPPER_WAVE_FREQUENCY
+                    #waveFinished = False
                     
-                    print waveTime, totalWaveTime
-                    if waveTime >= totalWaveTime:
+                    #print waveTime, totalWaveTime
+                    #if waveTime >= totalWaveTime:
                         
-                        waveTime = totalWaveTime
-                        waveFinished = True
+                        #waveTime = totalWaveTime
+                        #waveFinished = True
                         
-                    # Work out the current displacement from the initial position
-                    displacement = self.GRIPPER_WAVE_AMPLITUDE \
-                        * math.sin( waveTime*self.GRIPPER_WAVE_FREQUENCY*2.0*math.pi )
+                    ## Work out the current displacement from the initial position
+                    #displacement = self.GRIPPER_WAVE_AMPLITUDE \
+                        #* math.sin( waveTime*self.GRIPPER_WAVE_FREQUENCY*2.0*math.pi )
                     
                     
-                    servoAnglesDict = { "wrist_rotate" : self.wristAngle + displacement }
+                    #servoAnglesDict = { "wrist_rotate" : self.wristAngle + displacement }
                     
-                    self.roboticArm.setJointAngles( servoAnglesDict )
-                    if waveFinished:
-                        self.wavingGripper = False
+                    #self.roboticArm.setJointAngles( servoAnglesDict )
+                    #if waveFinished:
+                        #self.wavingGripper = False
 
                 # Save the time
                 lastTime = curTime
@@ -338,17 +348,13 @@ class MainWindow:
 #-------------------------------------------------------------------------------
 if __name__ == "__main__":
 
-    mainWindow = MainWindow()
-    mainWindow.main()
+    if len( sys.argv ) >= 2:
+        
+        bagFilename = sys.argv[ 1 ]
 
-# Connect to camera and robot via ROS
+        mainWindow = MainWindow( bagFilename )
+        mainWindow.main()
+        
+    else:
+        print "Please provide a bag file"
 
-# Display camera image
-
-# Wait until robot and camera are ready
-
-# Order arm to move to safe position - wait
-
-# Order arm to move to experiment position - wait
-
-# Waggle arm
