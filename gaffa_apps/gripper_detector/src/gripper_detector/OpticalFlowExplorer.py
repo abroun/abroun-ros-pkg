@@ -29,6 +29,8 @@ from matplotlib.axes import Subplot
 from matplotlib.backends.backend_gtkagg import FigureCanvasGTKAgg as FigureCanvas
 from matplotlib.backends.backend_gtkagg import NavigationToolbar2GTKAgg as NavigationToolbar
 
+from abroun_gtk_gui.widgets import SequenceControl
+
 def printTiming(func):
     def wrapper(*arg):
     
@@ -42,6 +44,90 @@ def printTiming(func):
     return wrapper
 
 #-------------------------------------------------------------------------------
+# Normalises a sequence of numbers by subtracting the mean and then dividing
+# by the standard deviation. This means that the sequence is centred at 0 and
+# 'mostly' within the range [-1,1]
+def normaliseSequence( sequence ):
+    
+    result = []
+    
+    numElements = len( sequence )
+    if numElements > 0:
+        
+        mean = sum( sequence )/numElements
+        
+        deviations = [ element - mean for element in sequence ]
+        #stdDev = math.sqrt( sum( [ deviation*deviation for deviation in deviations ] ) / numElements )
+        maxVal = math.sqrt( max( [ deviation*deviation for deviation in deviations ] ) )
+        
+        result = [ deviation / maxVal for deviation in deviations ]
+        
+    return result
+    
+#-------------------------------------------------------------------------------
+def resampleSequence( sequenceTimes, sequenceData, newSequenceTimes ):
+    
+    numExistingSamples = len( sequenceData )
+    numNewSamples = len( newSequenceTimes )
+    if numExistingSamples > 0:
+        
+        curData = 0.0
+        existingSampleIdx = 0
+        newSampleIdx = 0
+        result = []
+        
+        while newSampleIdx < numNewSamples:
+        
+            if existingSampleIdx >= numExistingSamples:
+                # We've run out of data so keep on using the last sample we had
+                result.append( curData )
+                newSampleIdx += 1
+            else:
+                # Use the current data until we reach a new bit of data
+                if newSequenceTimes[ newSampleIdx ] < sequenceTimes[ existingSampleIdx ]:
+                    result.append( curData )
+                    newSampleIdx += 1
+                else:    
+                    # Update the current data
+                    curData = sequenceData[ existingSampleIdx ]
+                    existingSampleIdx += 1
+            
+        
+    else:
+        result = [ 0.0 ] * numNewSamples
+        
+    return result
+    
+#-------------------------------------------------------------------------------
+def crossCorrelate( sequence, laggedSequence, lag ):
+    
+    acc = 0
+    sequenceLength = len( sequence )
+    laggedSequenceLength = len( laggedSequence )
+    
+    curIdx = 0
+    laggedIdx = curIdx + lag
+    while curIdx < sequenceLength and laggedIdx < laggedSequenceLength:
+        acc += sequence[ curIdx ]*laggedSequence[ laggedIdx ]
+        curIdx += 1
+        laggedIdx += 1
+        
+    # If the lagged sequence ended prematurely we assume that we just added on
+    # zeroes in place of the missing samples
+    numSamplesTested = curIdx
+    return acc / numSamplesTested
+    
+#-------------------------------------------------------------------------------
+# Calculates the cross correlation of a sequence for all possible lags
+def crossCorrelateComplete( sequence, laggedSequence ):
+    return [ crossCorrelate( sequence, laggedSequence, lag ) for lag in range( len( sequence ) ) ]
+    
+#-------------------------------------------------------------------------------
+def calculateEvolvingCrossCorrelation( sequence, laggedSequence, lag ):
+    return [ crossCorrelate( sequence[:sliceLength], laggedSequence, lag ) \
+        for sliceLength in range( 1, len( sequence ) + 1 ) ]
+
+#-------------------------------------------------------------------------------
 class MainWindow:
     
     OPTICAL_FLOW_BLOCK_WIDTH = 16
@@ -51,6 +137,8 @@ class MainWindow:
     
     TEST_X = 17 #17
     TEST_Y = 8 #8
+    
+    SAMPLES_PER_SECOND = 30.0
     
     GRIPPER_WAVE_FREQUENCY = 1.0    # Waves per second
     GRIPPER_NUM_WAVES = 3.0
@@ -63,21 +151,28 @@ class MainWindow:
         self.cameraImagePixBuf = None
         self.bagFilename = bagFilename
         self.lastImageGray = None
-        self.opticalFlowX = None
-        self.opticalFlowY = None
+        
         self.wavingGripper = False
         self.gripperWaveStartTime = None
         
-        startTime = None
         servoAngleTimes = []
         servoAngleData = []
-        imageTimes = []
-        opticalFlowDataX = []
-        opticalFlowDataY = []
+        self.imageTimes = []
+        self.cameraImages = []
+        self.opticalFlowArraysX = []    #  May contain 'None' elements
+        self.opticalFlowArraysY = []    #  May contain 'None' elements
         
-        numServoAngleReadings = 0
-        servoAngleMean = 0
         
+        # Calculate optical flow for all frames
+        
+        # When sample point is selected
+            # Resample optical flow
+            # Update graphs
+            
+        # Allow user to move back and forwards through the frames
+        
+        # Extract messages from the bag
+        startTime = None
         for topic, msg, t in rosrecord.logplayer( bagFilename ):
             if startTime == None:
                 startTime = t
@@ -85,43 +180,73 @@ class MainWindow:
             bagTime = t - startTime
                 
             if msg._type == "arm_driver_msgs/SetServoAngles":
-                servoAngleTimes.append( bagTime.to_seconds() )
+                servoAngleTimes.append( bagTime.to_sec() )
                 
                 servoAngle = msg.servoAngles[ 0 ].angle
                 servoAngleData.append( servoAngle )
                 
-                numServoAngleReadings += 1
-                servoAngleMean = servoAngleMean + (servoAngle - servoAngleMean)/(numServoAngleReadings)
-                
             elif msg._type == "sensor_msgs/Image":
                 
-                self.processCameraImage( msg )
-                
-                if self.opticalFlowX != None and self.opticalFlowY != None:
-                
-                    imageTimes.append( bagTime.to_seconds() )
-                    
-                    opticalFlowDataX.append( cv.Get2D( self.opticalFlowX, self.TEST_Y, self.TEST_X )[ 0 ] 
-                        / float( self.OPTICAL_FLOW_RANGE_WIDTH ) )
-                    opticalFlowDataY.append( cv.Get2D( self.opticalFlowY, self.TEST_Y, self.TEST_X )[ 0 ]
-                        / float( self.OPTICAL_FLOW_RANGE_HEIGHT ) )
+                opticalFlowArrayX, opticalFlowArrayY = self.processCameraImage( msg )
 
-        servoAngleData = [ angle - servoAngleMean for angle in servoAngleData ]
+                self.imageTimes.append( bagTime.to_sec() )
+                self.cameraImages.append( msg )
+                self.opticalFlowArraysX.append( opticalFlowArrayX )
+                self.opticalFlowArraysY.append( opticalFlowArrayY )
+                
+                #flowX = cv.Get2D( self.opticalFlowX, self.TEST_Y, self.TEST_X )[ 0 ] \
+                    #/ float( self.OPTICAL_FLOW_RANGE_WIDTH )
+                #flowY = cv.Get2D( self.opticalFlowY, self.TEST_Y, self.TEST_X )[ 0 ] \
+                    #/ float( self.OPTICAL_FLOW_RANGE_HEIGHT )
+                ##flowY = -flowY
+                
+                #opticalFlowDataX.append( flowX )
+                #opticalFlowDataY.append( flowY )
+                #opticalFlowDataMag.append( flowX + flowY )
+
+        # Construct regular sampled data from the input servo data
+        servoAngleData = normaliseSequence( servoAngleData )
+        dataDuration = math.ceil( max( servoAngleTimes[ -1 ], self.imageTimes[ -1 ] ) )
+        
+        regularSampleTimes = [ i*1.0/self.SAMPLES_PER_SECOND for i in range( int( dataDuration*self.SAMPLES_PER_SECOND ) ) ]
+        regularServoAngleData = resampleSequence( servoAngleTimes, servoAngleData, regularSampleTimes )
+        
+
+
+        
+        #opticalFlowDataX = normaliseSequence( opticalFlowDataX )
+        #opticalFlowDataY = normaliseSequence( opticalFlowDataY )
+        #opticalFlowDataMag = normaliseSequence( opticalFlowDataMag )
+        
+        #regularOpticalFlowDataX = resampleSequence( imageTimes, opticalFlowDataX, regularSampleTimes )
+        #regularOpticalFlowDataY = resampleSequence( imageTimes, opticalFlowDataY, regularSampleTimes )
+        
+        #crossCorrelationOpticalFlowX = crossCorrelateComplete( regularServoAngleData, regularOpticalFlowDataX )
+        #evolvingCCOpticalFlowX = calculateEvolvingCrossCorrelation(
+            #regularServoAngleData, regularOpticalFlowDataX, int( 0.45*self.SAMPLES_PER_SECOND ) )
+        #crossCorrelationOpticalFlowY = crossCorrelateComplete( regularServoAngleData, regularOpticalFlowDataY )
         
         # Create the matplotlib graph
         self.figure = Figure( figsize=(8,6), dpi=72 )
         self.axisX = self.figure.add_subplot( 211 )
         self.axisY = self.figure.add_subplot( 212 )
+        #self.axisMag = self.figure.add_subplot( 313 )
         
-        print servoAngleTimes
-        self.axisX.plot( servoAngleTimes, servoAngleData )
-        self.axisX.plot( imageTimes, opticalFlowDataX )
-        self.axisY.plot( servoAngleTimes, servoAngleData )
-        self.axisY.plot( imageTimes, opticalFlowDataY )
+        
+        #self.axisX.plot( regularSampleTimes, regularServoAngleData )
+        #self.axisX.plot( regularSampleTimes, regularOpticalFlowDataX )
+        #self.axisX.plot( regularSampleTimes, crossCorrelationOpticalFlowX )
+        #self.axisX.plot( regularSampleTimes, evolvingCCOpticalFlowX )
+        
 
-        self.canvas = FigureCanvas( self.figure ) # a gtk.DrawingArea
-        self.canvas.show()
-                
+        
+        #self.axisY.plot( regularSampleTimes, regularServoAngleData )
+        #self.axisY.plot( regularSampleTimes, regularOpticalFlowDataY )
+        #self.axisY.plot( regularSampleTimes, crossCorrelationOpticalFlowY )
+        
+        self.canvas = None  # Wait for GUI to be created before creating canvas
+        self.navToolbar = None
+ 
         # Setup the GUI        
         builder = gtk.Builder()
         builder.add_from_file( scriptPath + "/GUI/OpticalFlowExplorer.glade" )
@@ -130,16 +255,10 @@ class MainWindow:
         self.window = builder.get_object( "winMain" )
         self.vboxMain = builder.get_object( "vboxMain" )
         self.hboxWorkArea = builder.get_object( "hboxWorkArea" )
-        
-        self.hboxWorkArea.pack_start( self.canvas, True, True )
-        self.hboxWorkArea.show()
-        
-        # Navigation toolbar
-        self.navToolbar = NavigationToolbar( self.canvas, self.window )
-        self.navToolbar.lastDir = '/var/tmp/'
-        self.vboxMain.pack_start( self.navToolbar, expand=False, fill=False )
-        self.navToolbar.show()
-        self.vboxMain.show()
+        self.sequenceControls = builder.get_object( "sequenceControls" )
+        self.sequenceControls.setNumFrames( len( self.cameraImages ) )
+        self.sequenceControls.setOnFrameIdxChangedCallback( self.onSequenceControlsFrameIdxChanged )
+        self.setFrameIdx( 0 )
         
         builder.connect_signals( self )
                
@@ -147,6 +266,7 @@ class MainWindow:
         gobject.idle_add( updateLoop.next )
         
         self.window.show()
+        self.window.maximize()
         
     #---------------------------------------------------------------------------
     def onWinMainDestroy( self, widget, data = None ):  
@@ -157,9 +277,31 @@ class MainWindow:
         # All PyGTK applications must have a gtk.main(). Control ends here
         # and waits for an event to occur (like a key press or mouse event).
         gtk.main()
-        
+    
     #---------------------------------------------------------------------------
-    def createOpticalFlowStorage( self ):
+    def refreshGraphDisplay( self ):
+        
+        if self.canvas != None:   
+            self.canvas.destroy()  
+            self.canvas = None   
+        if self.navToolbar != None:
+            self.navToolbar.destroy()  
+            self.navToolbar = None   
+        
+        self.canvas = FigureCanvas( self.figure ) # a gtk.DrawingArea
+        self.canvas.show()
+        self.hboxWorkArea.pack_start( self.canvas, True, True )
+        self.hboxWorkArea.show()
+        
+        # Navigation toolbar
+        self.navToolbar = NavigationToolbar( self.canvas, self.window )
+        self.navToolbar.lastDir = '/var/tmp/'
+        self.vboxMain.pack_start( self.navToolbar, expand=False, fill=False )
+        self.navToolbar.show()
+        self.vboxMain.show()
+     
+    #---------------------------------------------------------------------------
+    def createOpticalFlowStorage( self, opticalFlowArrayX = None, opticalFlowArrayY = None ):
         
         if self.lastImageGray == None:
             raise Exception( "No image to measure for optical flow" )
@@ -167,36 +309,44 @@ class MainWindow:
         storageWidth = (self.lastImageGray.width - self.OPTICAL_FLOW_BLOCK_WIDTH)/self.OPTICAL_FLOW_BLOCK_WIDTH
         storageHeight = (self.lastImageGray.height - self.OPTICAL_FLOW_BLOCK_HEIGHT)/self.OPTICAL_FLOW_BLOCK_HEIGHT
         
-        if self.opticalFlowX == None \
-            or storageWidth != self.opticalFlowX.width \
-            or storageHeight != self.opticalFlowX.height:
+        if opticalFlowArrayX == None \
+            or storageWidth != opticalFlowArrayX.width \
+            or storageHeight != opticalFlowArrayX.height:
                 
-            self.opticalFlowX = cv.CreateMat( storageHeight, storageWidth, cv.CV_32FC1 )
+            opticalFlowArrayX = cv.CreateMat( storageHeight, storageWidth, cv.CV_32FC1 )
 
-        if self.opticalFlowY == None \
-            or storageWidth != self.opticalFlowY.width \
-            or storageHeight != self.opticalFlowY.height:
+        if opticalFlowArrayY == None \
+            or storageWidth != opticalFlowArrayY.width \
+            or storageHeight != opticalFlowArrayY.height:
                 
-            self.opticalFlowY = cv.CreateMat( storageHeight, storageWidth, cv.CV_32FC1 )
+            opticalFlowArrayY = cv.CreateMat( storageHeight, storageWidth, cv.CV_32FC1 )
+            
+        return ( opticalFlowArrayX, opticalFlowArrayY )
         
     #---------------------------------------------------------------------------
-    @printTiming
-    def calcOpticalFlow( self, curImageGray ):
+    #@printTiming
+    def calcOpticalFlow( self, curImageGray, opticalFlowArrayX = None, opticalFlowArrayY = None ):
         if self.lastImageGray != None:
                 
-            self.createOpticalFlowStorage()
+            opticalFlowArrayX, opticalFlowArrayY = \
+                self.createOpticalFlowStorage( opticalFlowArrayX, opticalFlowArrayY )
             
             cv.CalcOpticalFlowBM( self.lastImageGray, curImageGray, 
                 ( self.OPTICAL_FLOW_BLOCK_WIDTH, self.OPTICAL_FLOW_BLOCK_HEIGHT ),
                 ( self.OPTICAL_FLOW_BLOCK_WIDTH, self.OPTICAL_FLOW_BLOCK_HEIGHT ),
                 ( self.OPTICAL_FLOW_RANGE_WIDTH, self.OPTICAL_FLOW_RANGE_HEIGHT ),
-                0, self.opticalFlowX, self.opticalFlowY )
+                0, opticalFlowArrayX, opticalFlowArrayY )
             
         # Save the current image
         self.lastImageGray = curImageGray
         
+        return ( opticalFlowArrayX, opticalFlowArrayY )
+        
     #---------------------------------------------------------------------------
     def processCameraImage( self, rosImage ):
+        
+        opticalFlowArrayX = None
+        opticalFlowArrayY = None
         
         if rosImage.encoding == "rgb8":
             
@@ -207,7 +357,7 @@ class MainWindow:
             cv.CvtColor( curImageRGB, curImageGray, cv.CV_RGB2GRAY )
             
             # Look for optical flow between this image and the last one
-            self.calcOpticalFlow( curImageGray )
+            opticalFlowArrayX, opticalFlowArrayY = self.calcOpticalFlow( curImageGray )
             
             ## Display the image
             #self.cameraImagePixBuf = gtk.gdk.pixbuf_new_from_data( 
@@ -227,6 +377,34 @@ class MainWindow:
 
         else:
             rospy.logerr( "Unhandled image encoding - " + image.encoding )
+            
+        return ( opticalFlowArrayX, opticalFlowArrayY )
+    
+    #---------------------------------------------------------------------------
+    def setFrameIdx( self, frameIdx ):
+        
+        self.frameIdx = frameIdx
+        
+        # Display the frame
+        image = self.cameraImages[ frameIdx ]
+        self.cameraImagePixBuf = gtk.gdk.pixbuf_new_from_data( 
+            rosImage.data, 
+            gtk.gdk.COLORSPACE_RGB,
+            False,
+            8,
+            rosImage.width,
+            rosImage.height,
+            rosImage.step )
+
+        # Resize the drawing area if necessary
+        if self.dwgCameraImage.get_size_request() != ( rosImage.width, rosImage.height ):
+            self.dwgCameraImage.set_size_request( rosImage.width, rosImage.height )
+
+        self.dwgCameraImage.queue_draw()
+        
+    #---------------------------------------------------------------------------
+    def onSequenceControlsFrameIdxChanged( self, widget ):
+        self.setFrameIdx( widget.frameIdx )
         
     #---------------------------------------------------------------------------
     def onDwgCameraImageExposeEvent( self, widget, data = None ):

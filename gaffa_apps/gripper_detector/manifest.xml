@@ -15,6 +15,7 @@
   <depend package="sensor_msgs" />
   <depend package="gaffa_teleop" /> <!-- TODO: Remove this dependancy -->
   <depend package="opencv2" />
+  <depend package="abroun_gtk_gui" />
   
   <rosdep name="python-matplotlib"/>
 

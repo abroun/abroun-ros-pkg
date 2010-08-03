@@ -5,11 +5,15 @@
     <glade-widget-class name="FilePath"
                         generic-name="filePath"
                         title="File Path" />
+    <glade-widget-class name="SequenceControl"
+                        generic-name="sequenceControl"
+                        title="Sequence Control" />
   </glade-widget-classes>
 
   <glade-widget-group name="abroun_widgets" title="abroun Widgets">
 
     <glade-widget-class-ref name="FilePath"/>
+    <glade-widget-class-ref name="SequenceControl"/>
 
   </glade-widget-group>
   
