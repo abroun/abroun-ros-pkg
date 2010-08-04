@@ -68,7 +68,7 @@ class MainWindow:
     
         scriptPath = os.path.dirname( __file__ )
         self.cameraImagePixBuf = None
-        #self.servoConfigDict = getArmServoConfig()
+        self.servoConfigDict = getArmServoConfig()
         self.lastImageGray = None
         self.opticalFlowX = None
         self.opticalFlowY = None
@@ -78,11 +78,11 @@ class MainWindow:
         self.wristAngle = 0.0
             
         # Connect to the robot via ROS
-        rospy.init_node( 'GripperDetector', anonymous=True )
+        #rospy.init_node( 'GripperDetector', anonymous=True )
         
         # TODO: Move arm to all dictionary
-        #servoConfigList = [ self.servoConfigDict[ servoName ] for servoName in self.servoConfigDict ]
-        #self.roboticArm = RoboticArm( gaffa_teleop.LynxmotionArmDescription.ARM_DH_PROXIMAL, servoConfigList )
+        servoConfigList = [ self.servoConfigDict[ servoName ] for servoName in self.servoConfigDict ]
+        self.roboticArm = RoboticArm( gaffa_teleop.LynxmotionArmDescription.ARM_DH_PROXIMAL, servoConfigList )
         
         self.cameraImageTopic = rospy.Subscriber( "/camera/image", 
             sensor_msgs.msg.Image, self.cameraImageCallback )
@@ -133,7 +133,7 @@ class MainWindow:
             self.opticalFlowY = cv.CreateMat( storageHeight, storageWidth, cv.CV_32FC1 )
         
     #---------------------------------------------------------------------------
-    @printTiming
+    #@printTiming
     def calcOpticalFlow( self, curImageGray ):
         if self.lastImageGray != None:
                 

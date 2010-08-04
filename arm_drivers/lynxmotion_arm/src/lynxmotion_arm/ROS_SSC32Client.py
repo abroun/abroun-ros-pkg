@@ -26,6 +26,9 @@ class ROS_SSC32Client():
         servoAngles = [ arm_driver_msgs.msg.ServoAngle( 
             servoName=key, angle=servoAnglesDict[ key ] ) for key in servoAnglesDict ]
 
-        self.setServoAnglesPublisher.publish( arm_driver_msgs.msg.SetServoAngles(
-            servoAngles = servoAngles, movementSpeed = movementSpeed ) )
+        msg = arm_driver_msgs.msg.SetServoAngles(
+            servoAngles = servoAngles, movementSpeed = movementSpeed )
+        msg.header.stamp = rospy.Time.now()
+
+        self.setServoAnglesPublisher.publish( msg )
             

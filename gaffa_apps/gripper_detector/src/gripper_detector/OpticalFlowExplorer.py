@@ -60,7 +60,10 @@ def normaliseSequence( sequence ):
         #stdDev = math.sqrt( sum( [ deviation*deviation for deviation in deviations ] ) / numElements )
         maxVal = math.sqrt( max( [ deviation*deviation for deviation in deviations ] ) )
         
-        result = [ deviation / maxVal for deviation in deviations ]
+        if maxVal == 0:
+            result = deviations
+        else:
+            result = [ deviation / maxVal for deviation in deviations ]
         
     return result
     
@@ -130,13 +133,13 @@ def calculateEvolvingCrossCorrelation( sequence, laggedSequence, lag ):
 #-------------------------------------------------------------------------------
 class MainWindow:
     
-    OPTICAL_FLOW_BLOCK_WIDTH = 16
-    OPTICAL_FLOW_BLOCK_HEIGHT = 16
+    OPTICAL_FLOW_BLOCK_WIDTH = 8
+    OPTICAL_FLOW_BLOCK_HEIGHT = 8
     OPTICAL_FLOW_RANGE_WIDTH = 8    # Range to look outside of a block for motion
     OPTICAL_FLOW_RANGE_HEIGHT = 8
     
-    TEST_X = 17 #17
-    TEST_Y = 8 #8
+    MAX_TEST_POINT_X = (320 - OPTICAL_FLOW_BLOCK_WIDTH)/OPTICAL_FLOW_BLOCK_WIDTH - 1
+    MAX_TEST_POINT_Y = (240 - OPTICAL_FLOW_BLOCK_HEIGHT)/OPTICAL_FLOW_BLOCK_HEIGHT - 1
     
     SAMPLES_PER_SECOND = 30.0
     
@@ -194,55 +197,19 @@ class MainWindow:
                 self.opticalFlowArraysX.append( opticalFlowArrayX )
                 self.opticalFlowArraysY.append( opticalFlowArrayY )
                 
-                #flowX = cv.Get2D( self.opticalFlowX, self.TEST_Y, self.TEST_X )[ 0 ] \
-                    #/ float( self.OPTICAL_FLOW_RANGE_WIDTH )
-                #flowY = cv.Get2D( self.opticalFlowY, self.TEST_Y, self.TEST_X )[ 0 ] \
-                    #/ float( self.OPTICAL_FLOW_RANGE_HEIGHT )
-                ##flowY = -flowY
                 
-                #opticalFlowDataX.append( flowX )
-                #opticalFlowDataY.append( flowY )
-                #opticalFlowDataMag.append( flowX + flowY )
 
         # Construct regular sampled data from the input servo data
         servoAngleData = normaliseSequence( servoAngleData )
         dataDuration = math.ceil( max( servoAngleTimes[ -1 ], self.imageTimes[ -1 ] ) )
         
-        regularSampleTimes = [ i*1.0/self.SAMPLES_PER_SECOND for i in range( int( dataDuration*self.SAMPLES_PER_SECOND ) ) ]
-        regularServoAngleData = resampleSequence( servoAngleTimes, servoAngleData, regularSampleTimes )
-        
-
-
-        
-        #opticalFlowDataX = normaliseSequence( opticalFlowDataX )
-        #opticalFlowDataY = normaliseSequence( opticalFlowDataY )
-        #opticalFlowDataMag = normaliseSequence( opticalFlowDataMag )
-        
-        #regularOpticalFlowDataX = resampleSequence( imageTimes, opticalFlowDataX, regularSampleTimes )
-        #regularOpticalFlowDataY = resampleSequence( imageTimes, opticalFlowDataY, regularSampleTimes )
-        
-        #crossCorrelationOpticalFlowX = crossCorrelateComplete( regularServoAngleData, regularOpticalFlowDataX )
-        #evolvingCCOpticalFlowX = calculateEvolvingCrossCorrelation(
-            #regularServoAngleData, regularOpticalFlowDataX, int( 0.45*self.SAMPLES_PER_SECOND ) )
-        #crossCorrelationOpticalFlowY = crossCorrelateComplete( regularServoAngleData, regularOpticalFlowDataY )
+        self.regularSampleTimes = [ i*1.0/self.SAMPLES_PER_SECOND for i in range( int( dataDuration*self.SAMPLES_PER_SECOND ) ) ]
+        self.regularServoAngleData = resampleSequence( servoAngleTimes, servoAngleData, self.regularSampleTimes )
         
         # Create the matplotlib graph
         self.figure = Figure( figsize=(8,6), dpi=72 )
         self.axisX = self.figure.add_subplot( 211 )
         self.axisY = self.figure.add_subplot( 212 )
-        #self.axisMag = self.figure.add_subplot( 313 )
-        
-        
-        #self.axisX.plot( regularSampleTimes, regularServoAngleData )
-        #self.axisX.plot( regularSampleTimes, regularOpticalFlowDataX )
-        #self.axisX.plot( regularSampleTimes, crossCorrelationOpticalFlowX )
-        #self.axisX.plot( regularSampleTimes, evolvingCCOpticalFlowX )
-        
-
-        
-        #self.axisY.plot( regularSampleTimes, regularServoAngleData )
-        #self.axisY.plot( regularSampleTimes, regularOpticalFlowDataY )
-        #self.axisY.plot( regularSampleTimes, crossCorrelationOpticalFlowY )
         
         self.canvas = None  # Wait for GUI to be created before creating canvas
         self.navToolbar = None
@@ -255,10 +222,15 @@ class MainWindow:
         self.window = builder.get_object( "winMain" )
         self.vboxMain = builder.get_object( "vboxMain" )
         self.hboxWorkArea = builder.get_object( "hboxWorkArea" )
+        self.adjTestPointX = builder.get_object( "adjTestPointX" )
+        self.adjTestPointY = builder.get_object( "adjTestPointY" )
+        self.adjTestPointX.set_upper( self.MAX_TEST_POINT_X )
+        self.adjTestPointY.set_upper( self.MAX_TEST_POINT_Y )
         self.sequenceControls = builder.get_object( "sequenceControls" )
         self.sequenceControls.setNumFrames( len( self.cameraImages ) )
         self.sequenceControls.setOnFrameIdxChangedCallback( self.onSequenceControlsFrameIdxChanged )
         self.setFrameIdx( 0 )
+        self.processOpticalFlowData()
         
         builder.connect_signals( self )
                
@@ -277,14 +249,79 @@ class MainWindow:
         # All PyGTK applications must have a gtk.main(). Control ends here
         # and waits for an event to occur (like a key press or mouse event).
         gtk.main()
+        
+    #---------------------------------------------------------------------------
+    def processOpticalFlowData( self ):
+
+        testX = int( self.adjTestPointX.get_value() )
+        testY = int( self.adjTestPointY.get_value() )
+        
+        # Extract optical flow for the current test point
+        opticalFlowDataX = []
+        opticalFlowDataY = []
+        
+        for frameIdx in range( len( self.imageTimes ) ):
+            
+            opticalFlowX = self.opticalFlowArraysX[ frameIdx ]
+            opticalFlowY = self.opticalFlowArraysY[ frameIdx ]
+            
+            if opticalFlowX == None or opticalFlowY == None:
+                flowX = 0.0
+                flowY = 0.0
+            else:
+                flowX = cv.Get2D( self.opticalFlowArraysX[ frameIdx ], 
+                    testY, testX )[ 0 ] / float( self.OPTICAL_FLOW_RANGE_WIDTH )
+                flowY = cv.Get2D( self.opticalFlowArraysY[ frameIdx ], 
+                    testY, testX )[ 0 ] / float( self.OPTICAL_FLOW_RANGE_HEIGHT )
+                    
+                #if testX > 12:
+                #    flowX /= 8.0
+                #flowY = -flowY
+            
+            opticalFlowDataX.append( flowX )
+            opticalFlowDataY.append( flowY )
+        
+        # Normalise and resample the optical flow data
+        opticalFlowDataX = normaliseSequence( opticalFlowDataX )
+        opticalFlowDataY = normaliseSequence( opticalFlowDataY )
+        
+        regularOpticalFlowDataX = resampleSequence( self.imageTimes, opticalFlowDataX, self.regularSampleTimes )
+        regularOpticalFlowDataY = resampleSequence( self.imageTimes, opticalFlowDataY, self.regularSampleTimes )
+        
+        # Calculate correlation
+        crossCorrelationOpticalFlowX = crossCorrelateComplete( 
+            self.regularServoAngleData, regularOpticalFlowDataX )
+        evolvingCCOpticalFlowX = calculateEvolvingCrossCorrelation(
+            self.regularServoAngleData, regularOpticalFlowDataX, int( 0.45*self.SAMPLES_PER_SECOND ) )
+        crossCorrelationOpticalFlowY = crossCorrelateComplete( 
+            self.regularServoAngleData, regularOpticalFlowDataY )
+        evolvingCCOpticalFlowY = calculateEvolvingCrossCorrelation(
+            self.regularServoAngleData, regularOpticalFlowDataY, int( 0.45*self.SAMPLES_PER_SECOND ) )
+        
+        # Plot graphs
+        self.axisX.clear()
+        self.axisX.plot( self.regularSampleTimes, self.regularServoAngleData )
+        self.axisX.plot( self.regularSampleTimes, regularOpticalFlowDataX )
+        self.axisX.plot( self.regularSampleTimes, crossCorrelationOpticalFlowX )
+        self.axisX.plot( self.regularSampleTimes, evolvingCCOpticalFlowX )
+        
+        self.axisY.clear()
+        self.axisY.plot( self.regularSampleTimes, self.regularServoAngleData )
+        self.axisY.plot( self.regularSampleTimes, regularOpticalFlowDataY )
+        self.axisY.plot( self.regularSampleTimes, crossCorrelationOpticalFlowY )
+        self.axisY.plot( self.regularSampleTimes, evolvingCCOpticalFlowY )
+        
+        self.refreshGraphDisplay()
     
     #---------------------------------------------------------------------------
     def refreshGraphDisplay( self ):
         
         if self.canvas != None:   
+            self.hboxWorkArea.remove( self.canvas )
             self.canvas.destroy()  
             self.canvas = None   
         if self.navToolbar != None:
+            self.vboxMain.remove( self.navToolbar )
             self.navToolbar.destroy()  
             self.navToolbar = None   
         
@@ -388,23 +425,39 @@ class MainWindow:
         # Display the frame
         image = self.cameraImages[ frameIdx ]
         self.cameraImagePixBuf = gtk.gdk.pixbuf_new_from_data( 
-            rosImage.data, 
+            image.data, 
             gtk.gdk.COLORSPACE_RGB,
             False,
             8,
-            rosImage.width,
-            rosImage.height,
-            rosImage.step )
+            image.width,
+            image.height,
+            image.step )
 
         # Resize the drawing area if necessary
-        if self.dwgCameraImage.get_size_request() != ( rosImage.width, rosImage.height ):
-            self.dwgCameraImage.set_size_request( rosImage.width, rosImage.height )
+        if self.dwgCameraImage.get_size_request() != ( image.width, image.height ):
+            self.dwgCameraImage.set_size_request( image.width, image.height )
 
         self.dwgCameraImage.queue_draw()
-        
+    
+    #---------------------------------------------------------------------------
+    def onTestPointAdjustmentValueChanged( self, widget ):
+        self.processOpticalFlowData()
+        self.dwgCameraImage.queue_draw()
+    
     #---------------------------------------------------------------------------
     def onSequenceControlsFrameIdxChanged( self, widget ):
         self.setFrameIdx( widget.frameIdx )
+    
+    #---------------------------------------------------------------------------
+    def onDwgCameraImageButtonPressEvent( self, widget, data ):
+        
+        if self.cameraImagePixBuf != None:
+            
+            imgRect = self.getImageRectangleInWidget( widget,
+                self.cameraImagePixBuf.get_width(), self.cameraImagePixBuf.get_height() )
+        
+            self.adjTestPointX.set_value( int( ( data.x - imgRect.x )/self.OPTICAL_FLOW_BLOCK_WIDTH ) )
+            self.adjTestPointY.set_value( int( ( data.y - imgRect.y )/self.OPTICAL_FLOW_BLOCK_HEIGHT ) )            
         
     #---------------------------------------------------------------------------
     def onDwgCameraImageExposeEvent( self, widget, data = None ):
@@ -428,19 +481,38 @@ class MainWindow:
                 imgRect.x, imgRect.y, imgRect.width, imgRect.height )
                 
             # Draw the optical flow if it's available
-            if self.opticalFlowX != None and self.opticalFlowY != None:
+            opticalFlowX = self.opticalFlowArraysX[ self.frameIdx ]
+            opticalFlowY = self.opticalFlowArraysY[ self.frameIdx ]
+            if opticalFlowX != None and opticalFlowY != None:
+                
+                testX = int( self.adjTestPointX.get_value() )
+                testY = int( self.adjTestPointY.get_value() )
             
                 graphicsContext = widget.window.new_gc()
                 graphicsContext.set_rgb_fg_color( gtk.gdk.Color( 0, 65535, 0 ) )
                 
-                blockCentreY = self.OPTICAL_FLOW_BLOCK_HEIGHT / 2
-                for y in range( self.opticalFlowX.height ):
+                blockCentreY = imgRect.y + self.OPTICAL_FLOW_BLOCK_HEIGHT / 2
+                for y in range( opticalFlowX.height ):
                 
-                    blockCentreX = self.OPTICAL_FLOW_BLOCK_WIDTH / 2
-                    for x in range( self.opticalFlowX.width ):
+                    blockCentreX = imgRect.x + self.OPTICAL_FLOW_BLOCK_WIDTH / 2
+                    for x in range( opticalFlowX.width ):
                         
-                        endX = blockCentreX + cv.Get2D( self.opticalFlowX, y, x )[ 0 ]
-                        endY = blockCentreY + cv.Get2D( self.opticalFlowY, y, x )[ 0 ]
+                        if testX == x and testY == y:
+                            # Highlight the current test point
+                            radius = 2
+                            arcX = int( blockCentreX - radius )
+                            arcY = int( blockCentreY - radius )
+                            arcWidth = arcHeight = int( radius * 2 )
+            
+                            drawFilledArc = False
+                            graphicsContext.set_rgb_fg_color( gtk.gdk.Color( 65535, 65535, 65535 ) )
+
+                            widget.window.draw_arc( graphicsContext, 
+                                drawFilledArc, arcX, arcY, arcWidth, arcHeight, 0, 360 * 64 )
+                
+                        
+                        endX = blockCentreX + cv.Get2D( opticalFlowX, y, x )[ 0 ]
+                        endY = blockCentreY + cv.Get2D( opticalFlowY, y, x )[ 0 ]
                         
                         if endY < blockCentreY:
                             # Up is red

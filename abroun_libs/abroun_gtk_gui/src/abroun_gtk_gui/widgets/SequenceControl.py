@@ -64,6 +64,8 @@ class SequenceControl( gtk.VBox ):
         elif frameIdx >= self.numFrames:
             frameIdx = self.numFrames - 1
 
+        self.tbxFrameNumber.set_text( str( frameIdx + 1 ) )
+
         if frameIdx != self.frameIdx:
             # Move to the new frame
             self.frameIdx = frameIdx
@@ -82,11 +84,11 @@ class SequenceControl( gtk.VBox ):
     #---------------------------------------------------------------------------
     def onTbxFrameNumberFocusOutEvent( self, widget, data = None ):
         try:
-            self.setCurFrameIdx( int( self.tbxFrameNumber.get_text() ) - 1 )
+            self.setFrameIdx( int( self.tbxFrameNumber.get_text() ) - 1 )
         except:
             pass    # Catch errors that may occur whilst parsing an integer
 
     #---------------------------------------------------------------------------
-    def onTbxFrameNumberKeyPressed( self, widget, keyPressEvent ):
+    def onTbxFrameNumberKeyPressEvent( self, widget, keyPressEvent ):
         if gtk.gdk.keyval_name( keyPressEvent.keyval ) == "Return":
-            self.onTbxFrameNumberFocusOut( widget )
+            self.onTbxFrameNumberFocusOutEvent( widget )
