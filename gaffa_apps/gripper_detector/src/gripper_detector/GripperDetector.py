@@ -151,13 +151,18 @@ class MainWindow:
     #---------------------------------------------------------------------------
     def cameraImageCallback( self, rosImage ):
         
-        if rosImage.encoding == "rgb8":
+        if rosImage.encoding == "rgb8" or rosImage.encoding == "bgr8":
             
             # Create an OpenCV image to process the data
-            curImageRGB = cv.CreateImageHeader( ( rosImage.width, rosImage.height ), cv.IPL_DEPTH_8U, 3 )
-            cv.SetData( curImageRGB, rosImage.data, rosImage.step )
+            curImage = cv.CreateImageHeader( ( rosImage.width, rosImage.height ), cv.IPL_DEPTH_8U, 3 )
+            cv.SetData( curImage, rosImage.data, rosImage.step )
+            
             curImageGray = cv.CreateImage( ( rosImage.width, rosImage.height ), cv.IPL_DEPTH_8U, 1 )
-            cv.CvtColor( curImageRGB, curImageGray, cv.CV_RGB2GRAY )
+            
+            if rosImage.encoding == "bgr8":
+                cv.CvtColor( curImage, curImageGray, cv.CV_BGR2GRAY )
+            else:
+                cv.CvtColor( curImage, curImageGray, cv.CV_RGB2GRAY )
             
             # Look for optical flow between this image and the last one
             self.calcOpticalFlow( curImageGray )
@@ -179,7 +184,7 @@ class MainWindow:
             self.dwgCameraImage.queue_draw()
 
         else:
-            rospy.logerr( "Unhandled image encoding - " + image.encoding )
+            rospy.logerr( "Unhandled image encoding - " + rosImage.encoding )
         
     #---------------------------------------------------------------------------
     def onBtnGotoSafePosClicked( self, widget, data = None ):

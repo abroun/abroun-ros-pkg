@@ -9,6 +9,7 @@ from ros import rosrecord
 
 import sys
 import math
+import random
 import os.path
 import time
 
@@ -101,6 +102,16 @@ def resampleSequence( sequenceTimes, sequenceData, newSequenceTimes ):
         
     return result
     
+def covariance( x, y ):
+    numElements = len( x )
+    if numElements > 0:
+        eX = sum( x ) / numElements
+        eY = sum( y ) / numElements
+        eXY = sum( [ x[i]*y[i] for i in range( numElements ) ] ) / numElements
+        return eXY - eX*eY
+    else:
+        return 0.0
+    
 #-------------------------------------------------------------------------------
 def crossCorrelate( sequence, laggedSequence, lag ):
     
@@ -108,17 +119,33 @@ def crossCorrelate( sequence, laggedSequence, lag ):
     sequenceLength = len( sequence )
     laggedSequenceLength = len( laggedSequence )
     
-    curIdx = 0
-    laggedIdx = curIdx + lag
-    while curIdx < sequenceLength and laggedIdx < laggedSequenceLength:
-        acc += sequence[ curIdx ]*laggedSequence[ laggedIdx ]
-        curIdx += 1
-        laggedIdx += 1
+    numSamples = min( sequenceLength, laggedSequenceLength - lag )
+    if numSamples > 0:
         
-    # If the lagged sequence ended prematurely we assume that we just added on
-    # zeroes in place of the missing samples
-    numSamplesTested = curIdx
-    return acc / numSamplesTested
+        testSequence = sequence[:numSamples]
+        testLaggedSequence = laggedSequence[lag:lag+numSamples]
+        
+        varX = covariance( testSequence, testSequence )
+        varY = covariance( testLaggedSequence, testLaggedSequence )
+        if varX <= 0.0 or varY <= 0.0:
+            return 0.0
+        else:
+            return covariance( testSequence, testLaggedSequence ) / math.sqrt( varX*varY )
+        
+    else:
+        return 0.0
+    
+    #curIdx = 0
+    #laggedIdx = curIdx + lag
+    #while curIdx < sequenceLength and laggedIdx < laggedSequenceLength:
+        #acc += sequence[ curIdx ]*laggedSequence[ laggedIdx ]
+        #curIdx += 1
+        #laggedIdx += 1
+        
+    ## If the lagged sequence ended prematurely we assume that we just added on
+    ## zeroes in place of the missing samples
+    #numSamplesTested = curIdx
+    #return acc / numSamplesTested
     
 #-------------------------------------------------------------------------------
 # Calculates the cross correlation of a sequence for all possible lags
@@ -197,7 +224,9 @@ class MainWindow:
                 self.opticalFlowArraysX.append( opticalFlowArrayX )
                 self.opticalFlowArraysY.append( opticalFlowArrayY )
                 
-                
+        #servoAngleVelocity = [ servoAngleData[ i ] - servoAngleData[ i - 1 ] for i in range( 1, len( servoAngleData ) ) ]
+        #servoAngleData = [ 0 ] + servoAngleVelocity
+        #servoAngleData[ -1 ] = 0
 
         # Construct regular sampled data from the input servo data
         servoAngleData = normaliseSequence( servoAngleData )
@@ -270,9 +299,9 @@ class MainWindow:
                 flowY = 0.0
             else:
                 flowX = cv.Get2D( self.opticalFlowArraysX[ frameIdx ], 
-                    testY, testX )[ 0 ] / float( self.OPTICAL_FLOW_RANGE_WIDTH )
+                    testY, testX )[ 0 ] / self.OPTICAL_FLOW_BLOCK_WIDTH
                 flowY = cv.Get2D( self.opticalFlowArraysY[ frameIdx ], 
-                    testY, testX )[ 0 ] / float( self.OPTICAL_FLOW_RANGE_HEIGHT )
+                    testY, testX )[ 0 ] / self.OPTICAL_FLOW_BLOCK_HEIGHT
                     
                 #if testX > 12:
                 #    flowX /= 8.0
@@ -282,11 +311,16 @@ class MainWindow:
             opticalFlowDataY.append( flowY )
         
         # Normalise and resample the optical flow data
-        opticalFlowDataX = normaliseSequence( opticalFlowDataX )
-        opticalFlowDataY = normaliseSequence( opticalFlowDataY )
+        #opticalFlowDataX = normaliseSequence( opticalFlowDataX )
+        #opticalFlowDataY = normaliseSequence( opticalFlowDataY )
+        #print opticalFlowDataY
         
         regularOpticalFlowDataX = resampleSequence( self.imageTimes, opticalFlowDataX, self.regularSampleTimes )
         regularOpticalFlowDataY = resampleSequence( self.imageTimes, opticalFlowDataY, self.regularSampleTimes )
+        
+        #regularOpticalFlowDataX = [ self.regularServoAngleData[ i ]*(1.0+random.gauss( 0, 0.0 )) \
+        #    for i in range( len( self.regularServoAngleData ) ) ]
+        #regularOpticalFlowDataX = normaliseSequence( regularOpticalFlowDataX )
         
         # Calculate correlation
         crossCorrelationOpticalFlowX = crossCorrelateComplete( 
@@ -385,7 +419,7 @@ class MainWindow:
         opticalFlowArrayX = None
         opticalFlowArrayY = None
         
-        if rosImage.encoding == "rgb8":
+        if rosImage.encoding == "rgb8" or rosImage.encoding == "bgr8":
             
             # Create an OpenCV image to process the data
             curImageRGB = cv.CreateImageHeader( ( rosImage.width, rosImage.height ), cv.IPL_DEPTH_8U, 3 )
@@ -413,7 +447,7 @@ class MainWindow:
             #self.dwgCameraImage.queue_draw()
 
         else:
-            rospy.logerr( "Unhandled image encoding - " + image.encoding )
+            rospy.logerr( "Unhandled image encoding - " + rosImage.encoding )
             
         return ( opticalFlowArrayX, opticalFlowArrayY )
     

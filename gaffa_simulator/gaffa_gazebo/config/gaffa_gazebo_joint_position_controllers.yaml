@@ -1,6 +1,6 @@
 base_rotate_position_controller:
   type: robot_mechanism_controllers/JointPositionController
-  joint: base_rotate_joint
+  joint: lynxmotion_base_rotate_joint
   pid: &base_rotate_position_gains
     p: 7.0
     d: 0.25
@@ -8,7 +8,7 @@ base_rotate_position_controller:
     i_clamp: 1.0
 shoulder_rotate_position_controller:
   type: robot_mechanism_controllers/JointPositionController
-  joint: shoulder_rotate_joint
+  joint: lynxmotion_shoulder_rotate_joint
   pid: &shoulder_rotate_position_gains
     p: 40.0
     d: 0.5
@@ -16,7 +16,7 @@ shoulder_rotate_position_controller:
     i_clamp: 1.0
 elbow_rotate_position_controller:
   type: robot_mechanism_controllers/JointPositionController
-  joint: elbow_rotate_joint
+  joint: lynxmotion_elbow_rotate_joint
   pid: &elbow_rotate_position_gains
     p: 20.0
     d: 0.25
@@ -24,7 +24,7 @@ elbow_rotate_position_controller:
     i_clamp: 1.0
 wrist_rotate_position_controller:
   type: robot_mechanism_controllers/JointPositionController
-  joint: wrist_rotate_joint
+  joint: lynxmotion_wrist_rotate_joint
   pid: &wrist_rotate_position_gains
     p: 5.0
     d: 0.25
@@ -32,7 +32,7 @@ wrist_rotate_position_controller:
     i_clamp: 1.0
 gripper_rotate_position_controller:
   type: robot_mechanism_controllers/JointPositionController
-  joint: gripper_rotate_joint
+  joint: lynxmotion_gripper_rotate_joint
   pid: &gripper_rotate_position_gains
     p: 2.5
     d: 0.25
