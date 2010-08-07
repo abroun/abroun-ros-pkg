@@ -177,7 +177,54 @@ class SignalDetector:
         return [ self.crossCorrelate( sequence, laggedSequence, lag ) \
             for lag in range( numCorrelations ) ]
 
+#-------------------------------------------------------------------------------
+def covariance( x, y ):
+    numElements = len( x )
+    if numElements > 0:
+        eX = np.sum( x ) / numElements
+        eY = np.sum( y ) / numElements
+        eXY = np.sum( np.multiply( x, y ) ) / numElements
+        return eXY - eX*eY
+    else:
+        return 0.0
             
+#-------------------------------------------------------------------------------
+def crossCorrelate( sequence, laggedSequence, lag ):
+    
+    acc = 0
+    sequenceLength = len( sequence )
+    laggedSequenceLength = len( laggedSequence )
+    
+    numSamples = min( sequenceLength - lag, laggedSequenceLength )
+    if numSamples > 0:
+        
+        testSequence = sequence[lag:lag+numSamples]
+        testLaggedSequence = laggedSequence[:numSamples]
+        
+        varX = covariance( testSequence, testSequence )
+        varY = covariance( testLaggedSequence, testLaggedSequence )
+        if varX <= 0.0 or varY <= 0.0:
+            return 0.0
+        else:
+            return covariance( testSequence, testLaggedSequence ) / math.sqrt( varX*varY )
+        
+    else:
+        return 0.0
+        
+#-------------------------------------------------------------------------------
+# Calculates the cross correlation of a sequence for all possible lags
+def crossCorrelateComplete( sequence, laggedSequence, maxLag = None ):
+    
+    if maxLag != None:
+        numCorrelations = maxLag + 1
+    else:
+        numCorrelations = len( sequence )
+        
+    result = np.ndarray( shape=(numCorrelations), dtype=np.float32 )
+    for lag in range( numCorrelations ):
+        result[ lag ] = crossCorrelate( sequence, laggedSequence, lag )
+        
+    return result
 
 #-------------------------------------------------------------------------------
 class OpticalFlowFilter:
@@ -258,51 +305,11 @@ def normaliseSequence( sequence ):
 #-------------------------------------------------------------------------------
 def resampleSequence( sequenceTimes, sequenceData, newSequenceTimes ):
     
-    numExistingSamples = len( sequenceData )
-    numNewSamples = len( newSequenceTimes )
-    if numExistingSamples > 0:
-        
-        curData = 0.0
-        existingSampleIdx = 0
-        newSampleIdx = 0
-        result = []
-        
-        while newSampleIdx < numNewSamples:
-        
-            if existingSampleIdx >= numExistingSamples:
-                # We've run out of data so keep on using the last sample we had
-                result.append( curData )
-                newSampleIdx += 1
-            else:
-                # Use the current data until we reach a new bit of data
-                if newSequenceTimes[ newSampleIdx ] < sequenceTimes[ existingSampleIdx ]:
-                    result.append( curData )
-                    newSampleIdx += 1
-                else:    
-                    # Update the current data
-                    curData = sequenceData[ existingSampleIdx ]
-                    existingSampleIdx += 1
-            
-        
-    else:
-        result = [ 0.0 ] * numNewSamples
-        
-    return result
-    
+    # Construct a spline to represent the sequence
+    tck = scipy.interpolate.splrep( sequenceTimes, sequenceData )
 
-    
-    #curIdx = 0
-    #laggedIdx = curIdx + lag
-    #while curIdx < sequenceLength and laggedIdx < laggedSequenceLength:
-        #acc += sequence[ curIdx ]*laggedSequence[ laggedIdx ]
-        #curIdx += 1
-        #laggedIdx += 1
-        
-    ## If the lagged sequence ended prematurely we assume that we just added on
-    ## zeroes in place of the missing samples
-    #numSamplesTested = curIdx
-    #return acc / numSamplesTested
-    
+    # Evaluate spline at new sample points
+    return scipy.interpolate.splev( newSequenceTimes,tck )
     
 #-------------------------------------------------------------------------------
 def calculateEvolvingCrossCorrelation( sequence, laggedSequence, lag ):
@@ -339,7 +346,6 @@ class MainWindow:
         
         servoAngleTimes = []
         servoAngleData = []
-        self.imageTimes = []
         self.cameraImages = []
         
         self.signalDetector = SignalDetector()
@@ -360,6 +366,7 @@ class MainWindow:
                     
                 numImages += 1
         
+        self.imageTimes = np.ndarray(shape=( numImages ), dtype=np.float32)
         opticalFlowArrayShape = ( opticalFlowHeight, opticalFlowWidth, numImages )
         self.opticalFlowArraysX = np.ndarray(shape=opticalFlowArrayShape, dtype=np.float32)
         self.opticalFlowArraysY = np.ndarray(shape=opticalFlowArrayShape, dtype=np.float32)
@@ -384,13 +391,13 @@ class MainWindow:
                 
                 opticalFlowArrayX, opticalFlowArrayY = self.processCameraImage( msg )
 
-                self.imageTimes.append( bagTime.to_sec() )
+                self.imageTimes[ imgIdx ] = bagTime.to_sec()
                 self.cameraImages.append( msg )
                 
                 #print dir( cv )
                 #print dir( opticalFlowArrayX )
                 #opNumPy = cvAdaptors.Ipl2NumPy( opticalFlowArrayX )
-                cv.Set2D( opticalFlowArrayX, 0, 0, len( self.imageTimes )%8 )
+                cv.Set2D( opticalFlowArrayX, 0, 0, imgIdx%8 )
                 
                 
                 t1 = time.time()
@@ -423,18 +430,9 @@ class MainWindow:
         servoAngleData = normaliseSequence( servoAngleData )
         dataDuration = math.ceil( max( servoAngleTimes[ -1 ], self.imageTimes[ -1 ] ) )
         
-        self.regularSampleTimes = [ i*1.0/self.SAMPLES_PER_SECOND for i in range( int( dataDuration*self.SAMPLES_PER_SECOND ) ) ]
+        self.regularSampleTimes = np.arange( 0.0, dataDuration, 1.0/self.SAMPLES_PER_SECOND )
         
-        servoAngleDataSpline = scipy.signal.cspline1d( np.array( servoAngleData ) )
-        self.regularServoAngleData = scipy.signal.cspline1d_eval( 
-            servoAngleDataSpline, np.array( self.regularSampleTimes ),
-            dx=self.imageTimes[ 1 ]-self.imageTimes[ 0 ], x0=0.0 )
-            
-        # spline parameters
-        s=3.0 # smoothness parameter
-        k=5 # spline order
-        nest=-1 # estimate of number of knots needed (-1 = maximal)
-
+        t1 = time.time()
         # Pad the servo readings with zeros at the start and end
         preTimes = np.arange( 0.0, servoAngleTimes[ 0 ], 0.1 )
         preReadings = np.zeros( len( preTimes ) )
@@ -446,37 +444,74 @@ class MainWindow:
         
         self.A = servoAngleTimes
         self.B = servoAngleData
+        
+        self.regularServoAngleData = resampleSequence( 
+            npAngleTimes, npAngleData, self.regularSampleTimes )
             
         tck = scipy.interpolate.splrep( npAngleTimes, npAngleData )
 
         # evaluate spline, including interpolated points
         self.regularServoAngleData = scipy.interpolate.splev(
             np.array( self.regularSampleTimes ),tck)
-
+        t2 = time.time()
+        print 'Resampling took %0.3f ms' % ((t2-t1)*1000.0)
         
         #self.regularServoAngleData = resampleSequence( servoAngleTimes, servoAngleData, self.regularSampleTimes )
         
-        op = []
-        for a in [ self.opticalFlowArraysX, self.opticalFlowArraysY ]:
-            b = []
-            for rowIdx in range( a.shape[ 0 ] ):
-                row = []
-                for colIdx in range( a.shape[ 1 ] ):
-                    newArray = resampleSequence( self.imageTimes, a[ rowIdx, colIdx ].tolist(), self.regularSampleTimes )
+        t1 = time.time()
+        
+        regularOpticalFlowArrayShape = \
+            ( opticalFlowHeight, opticalFlowWidth, len( self.regularSampleTimes ) )
+        self.regularOpticalFlowArrayX = np.ndarray(shape=regularOpticalFlowArrayShape, dtype=np.float32)
+        self.regularOpticalFlowArrayY = np.ndarray(shape=regularOpticalFlowArrayShape, dtype=np.float32)
+        
+        for a in [ ( self.opticalFlowArraysX, self.regularOpticalFlowArrayX ), 
+            ( self.opticalFlowArraysY, self.regularOpticalFlowArrayY ) ]:
+                
+            for rowIdx in range( a[0].shape[ 0 ] ):
+                for colIdx in range( a[0].shape[ 1 ] ):
+                                        
+                    newArray = resampleSequence( self.imageTimes, a[0][ rowIdx, colIdx, : ], self.regularSampleTimes )
                     #print newArray
-                    row.append( [newArray] )
-                b.append( row )
-            op.append( b )
-        self.regularOpticalFlowArrayX = b[ 0 ]
-        self.regularOpticalFlowArrayY = b[ 1 ]
+                    a[1][ rowIdx, colIdx, : ] = newArray
+        
+        t2 = time.time()
+        print 'Resampling took %0.3f ms' % ((t2-t1)*1000.0)
+        
+        cor = np.correlate( self.regularServoAngleData,
+            self.regularOpticalFlowArrayX[ 0, 0 ], mode="full" )
+        print cor
+        print len( cor ), len( self.regularServoAngleData )
                     
         t1 = time.time()
-        self.correlationsX = self.signalDetector.crossCorrelateArray( 
-            self.regularServoAngleData, self.regularOpticalFlowArrayX,
-            int ( 1.0*self.SAMPLES_PER_SECOND ) )
-        self.correlationsY = self.signalDetector.crossCorrelateArray( 
-            self.regularServoAngleData, self.regularOpticalFlowArrayY,
-            int ( 1.0*self.SAMPLES_PER_SECOND ) )
+        #self.correlationsX = self.signalDetector.crossCorrelateArray( 
+        #    self.regularServoAngleData, self.regularOpticalFlowArrayX,
+        #    int ( 1.0*self.SAMPLES_PER_SECOND ) )
+        #self.correlationsY = self.signalDetector.crossCorrelateArray( 
+        #    self.regularServoAngleData, self.regularOpticalFlowArrayY,
+        #    int ( 1.0*self.SAMPLES_PER_SECOND ) )
+        
+        self.correlationsX = np.ndarray(shape=regularOpticalFlowArrayShape, dtype=np.float32)
+        self.correlationsY = np.ndarray(shape=regularOpticalFlowArrayShape, dtype=np.float32)
+        
+        maxLag = int( 1.0 * self.SAMPLES_PER_SECOND )
+        for a in [ ( self.regularOpticalFlowArrayX, self.correlationsX ), 
+            ( self.regularOpticalFlowArrayY, self.correlationsY ) ]:
+                
+            for rowIdx in range( a[0].shape[ 0 ] ):
+                for colIdx in range( a[0].shape[ 1 ] ):
+                                        
+                    #newArray = np.correlate(
+                    #    self.regularServoAngleData, a[0][ rowIdx, colIdx, : ], mode="full" )
+                    #print newArray
+                    #a[1][ rowIdx, colIdx, : ] = newArray[ a[0].shape[ 2 ] - 1 : ]
+                    
+                    newArray = crossCorrelateComplete( 
+                       a[0][ rowIdx, colIdx, : ],  self.regularServoAngleData, maxLag )
+                    a[1][ rowIdx, colIdx, :maxLag+1 ] = newArray
+                    
+        
+        
         t2 = time.time()
         print 'Correlation took %0.3f ms' % ((t2-t1)*1000.0)
         
@@ -592,7 +627,7 @@ class MainWindow:
         # Plot graphs
         self.axisX.clear()
         self.axisX.plot( self.regularSampleTimes, self.regularServoAngleData )
-        self.axisX.plot( self.A, self.B )
+        #self.axisX.plot( self.A, self.B )
         self.axisX.plot( self.regularSampleTimes, regularOpticalFlowDataX )
         self.axisX.plot( self.regularSampleTimes[:len(crossCorrelationOpticalFlowX)], crossCorrelationOpticalFlowX )
         #self.axisX.plot( self.regularSampleTimes, evolvingCCOpticalFlowX )
