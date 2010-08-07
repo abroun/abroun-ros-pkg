@@ -18,6 +18,8 @@
   <depend package="abroun_gtk_gui" />
   
   <rosdep name="python-matplotlib"/>
+  <rosdep name="python-numpy"/>
+  <rosdep name="python-scipy"/>
 
 </package>
 

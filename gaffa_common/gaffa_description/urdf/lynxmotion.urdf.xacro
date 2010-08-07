@@ -97,6 +97,9 @@
 <joint name="${name}_base_rotate_joint" type="revolute" >
     <axis xyz="0 0 1" />
     <limit upper="${M_PI/2}" lower="${-M_PI/2}" effort="100" velocity="5" />
+    <safety_controller k_position="20" k_velocity="4" 
+        soft_upper_limit="${M_PI/2 - 0.10}" 
+        soft_lower_limit="${-M_PI/2 + 0.10}" />
     <parent link="${name}_base_block" />
     <origin xyz="0 0 ${BASE_ROTATE_HEIGHT/2 + BASE_HEIGHT}" rpy="0 0 0" />
     <child link="${name}_base_rotate_link" />
@@ -134,6 +137,9 @@
 <joint name="${name}_shoulder_rotate_joint" type="revolute" >
     <axis xyz="0 0 1" />
     <limit upper="${3*M_PI/4}" lower="0" effort="100" velocity="5" />
+    <safety_controller k_position="20" k_velocity="4" 
+        soft_upper_limit="${3*M_PI/4 - 0.10}" 
+        soft_lower_limit="${0.0 + 0.10}" />
     <parent link="${name}_base_rotate_link" />
     <origin xyz="0 0 ${SHOULDER_HEIGHT - BASE_ROTATE_HEIGHT/2}" rpy="${M_PI/2} 0 0" />
     <child link="${name}_upper_arm_link" />
@@ -170,7 +176,10 @@
 <!-- Elbow and Forearm -->
 <joint name="${name}_elbow_rotate_joint" type="revolute" >
     <axis xyz="0 0 1" />
-    <limit upper="0" lower="${-3*M_PI/4}" effort="100" velocity="5" />
+    <limit upper="0" lower="${-7*M_PI/8}" effort="100" velocity="5" />
+    <safety_controller k_position="20" k_velocity="4" 
+        soft_upper_limit="${0.0 - 0.10}" 
+        soft_lower_limit="${-7*M_PI/8 + 0.10}" />
     <parent link="${name}_upper_arm_link" />
     <origin xyz="${UPPER_ARM_LENGTH} 0 0.0" rpy="0 0 0" />
     <child link="${name}_fore_arm_link" />
@@ -207,7 +216,10 @@
 <!-- Wrist -->
 <joint name="${name}_wrist_rotate_joint" type="revolute" >
     <axis xyz="0 0 1" />
-    <limit upper="${M_PI}" lower="${0}" effort="100" velocity="5" />
+    <limit upper="${M_PI}" lower="${0.0}" effort="100" velocity="5" />
+    <!--<safety_controller k_position="20" k_velocity="4" 
+        soft_upper_limit="${M_PI - 0.10}" 
+        soft_lower_limit="${0.0 + 0.10}" />-->
     <parent link="${name}_fore_arm_link" />
     <origin xyz="${FORE_ARM_LENGTH} 0 0.0" rpy="0 0 ${-M_PI/2}" />
     <child link="${name}_wrist_link" />
@@ -245,6 +257,9 @@
 <joint name="${name}_gripper_rotate_joint" type="revolute" >
     <axis xyz="0 0 1" />
     <limit upper="${M_PI/2}" lower="${-M_PI/2}" effort="100" velocity="5" />
+    <!--<safety_controller k_position="20" k_velocity="4" 
+        soft_upper_limit="${M_PI/2 - 0.10}" 
+        soft_lower_limit="${-M_PI/2 + 0.10}" />-->
     <parent link="${name}_wrist_link" />
     <origin xyz="${WRIST_LENGTH} 0 0.0" rpy="0 ${M_PI/2} 0" />
     <child link="${name}_gripper_base_link" />
