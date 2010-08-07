@@ -178,6 +178,16 @@ class SignalDetector:
             for lag in range( numCorrelations ) ]
 
 #-------------------------------------------------------------------------------
+def variance( x ):
+    numElements = len( x )
+    if numElements > 0:
+        eX = np.sum( x ) / numElements
+        eXX = np.sum( np.multiply( x, x ) ) / numElements
+        return eXX - eX*eX
+    else:
+        return 0.0
+
+#-------------------------------------------------------------------------------
 def covariance( x, y ):
     numElements = len( x )
     if numElements > 0:
@@ -201,30 +211,69 @@ def crossCorrelate( sequence, laggedSequence, lag ):
         testSequence = sequence[lag:lag+numSamples]
         testLaggedSequence = laggedSequence[:numSamples]
         
-        varX = covariance( testSequence, testSequence )
-        varY = covariance( testLaggedSequence, testLaggedSequence )
+        #print np.cov( testSequence, testLaggedSequence )[ 0, 1 ] - \
+        #    covariance( testSequence, testLaggedSequence )
+        #if covariance( testSequence, testLaggedSequence ) != 0.0:
+        #    sys.exit()
+        #return np.correlate( testSequence, testLaggedSequence )[ 0 ]
+        
+        return np.corrcoef( testSequence, testLaggedSequence )[ 0, 1 ]
+        
+        varX = np.cov( testSequence, testSequence )[ 0, 1 ]
+        varY = np.cov( testLaggedSequence, testLaggedSequence )[ 0, 1 ]
         if varX <= 0.0 or varY <= 0.0:
             return 0.0
         else:
-            return covariance( testSequence, testLaggedSequence ) / math.sqrt( varX*varY )
+            cc = np.cov( testSequence, testLaggedSequence )[ 0, 1 ] / math.sqrt( varX*varY )
+            print cc - np.corrcoef( testSequence, testLaggedSequence )[ 0, 1 ]
         
     else:
         return 0.0
         
 #-------------------------------------------------------------------------------
 # Calculates the cross correlation of a sequence for all possible lags
-def crossCorrelateComplete( sequence, laggedSequence, maxLag = None ):
+def crossCorrelateComplete( sequence, laggedSequence, maxLag = None, debug = False ):
+
+    # x
+    x = sequence
+    sum_x = np.add.accumulate( x[ ::-1 ] )[ ::-1 ] 
+    sum_x2 = np.add.accumulate( np.square( x )[ ::-1 ] )[ ::-1 ] 
+    len_x = np.arange( len( x ), 0, -1 )
+
+    var_x = np.divide( np.subtract( np.multiply( sum_x2, len_x ), np.square( sum_x ) ), np.square( len_x ) )
+
+    if debug:
+        print var_x
+
+    # y
+    y = laggedSequence
+
+    sum_y = np.add.accumulate( y )
+    sum_y2 = np.add.accumulate( np.square( y ) )
+    len_y = np.arange( 1, len( y ) + 1, 1 )
+
+    var_y = np.divide( np.subtract( np.multiply( sum_y2, len_y ), np.square( sum_y ) ), np.square( len_y ) )
+
+    # xy
+    sum_xy = np.correlate( x, y, mode="full" )[ len( x ) - 1: ]
+    cov_xy = np.divide( np.subtract( np.multiply( sum_xy, len_x ), np.multiply( sum_x, sum_y[::-1] ) ), np.square( len_x ) )
+
+    corrCoeff = np.divide( cov_xy, np.sqrt( np.multiply( var_x, var_y[ ::-1 ] ) ) )
+    corrCoeff[ np.logical_or( np.isnan( corrCoeff ), np.isinf( corrCoeff ) ) ] = 0.0
     
-    if maxLag != None:
-        numCorrelations = maxLag + 1
-    else:
-        numCorrelations = len( sequence )
+    return corrCoeff
+    
+    
+    #if maxLag != None:
+        #numCorrelations = maxLag + 1
+    #else:
+        #numCorrelations = len( sequence )
         
-    result = np.ndarray( shape=(numCorrelations), dtype=np.float32 )
-    for lag in range( numCorrelations ):
-        result[ lag ] = crossCorrelate( sequence, laggedSequence, lag )
+    #result = np.ndarray( shape=(numCorrelations), dtype=np.float32 )
+    #for lag in range( numCorrelations ):
+        #result[ lag ] = crossCorrelate( sequence, laggedSequence, lag )
         
-    return result
+    #return result
 
 #-------------------------------------------------------------------------------
 class OpticalFlowFilter:
@@ -491,24 +540,35 @@ class MainWindow:
         #    self.regularServoAngleData, self.regularOpticalFlowArrayY,
         #    int ( 1.0*self.SAMPLES_PER_SECOND ) )
         
-        self.correlationsX = np.ndarray(shape=regularOpticalFlowArrayShape, dtype=np.float32)
-        self.correlationsY = np.ndarray(shape=regularOpticalFlowArrayShape, dtype=np.float32)
-        
         maxLag = int( 1.0 * self.SAMPLES_PER_SECOND )
-        for a in [ ( self.regularOpticalFlowArrayX, self.correlationsX ), 
-            ( self.regularOpticalFlowArrayY, self.correlationsY ) ]:
+        self.correlationsX = np.apply_along_axis( crossCorrelateComplete, 2, 
+            self.regularOpticalFlowArrayX, self.regularServoAngleData, maxLag )
+        self.correlationsY = np.apply_along_axis( crossCorrelateComplete, 2, 
+            self.regularOpticalFlowArrayY, self.regularServoAngleData, maxLag )
+            
+        crossCorrelateComplete( self.regularOpticalFlowArrayX[ 16, 32 ], 
+            self.regularServoAngleData, maxLag, True )
+
+        #self.correlationsX = cor2( np.array( self.regularServoAngleData ), 
+        #    np.array( self.regularServoAngleData ) ) #, 30 )
+        #self.correlationsX = np.ndarray(shape=regularOpticalFlowArrayShape, dtype=np.float32)
+        #self.correlationsY = np.ndarray(shape=regularOpticalFlowArrayShape, dtype=np.float32)
+        
+        
+        #for a in [ #( self.regularOpticalFlowArrayX, self.correlationsX ), 
+            #( self.regularOpticalFlowArrayY, self.correlationsY ) ]:
                 
-            for rowIdx in range( a[0].shape[ 0 ] ):
-                for colIdx in range( a[0].shape[ 1 ] ):
+            #for rowIdx in range( a[0].shape[ 0 ] ):
+                #for colIdx in range( a[0].shape[ 1 ] ):
                                         
-                    #newArray = np.correlate(
-                    #    self.regularServoAngleData, a[0][ rowIdx, colIdx, : ], mode="full" )
-                    #print newArray
-                    #a[1][ rowIdx, colIdx, : ] = newArray[ a[0].shape[ 2 ] - 1 : ]
+                    ##newArray = np.correlate(
+                    ##    self.regularServoAngleData, a[0][ rowIdx, colIdx, : ], mode="full" )
+                    ##print newArray
+                    ##a[1][ rowIdx, colIdx, : ] = newArray[ a[0].shape[ 2 ] - 1 : ]
                     
-                    newArray = crossCorrelateComplete( 
-                       a[0][ rowIdx, colIdx, : ],  self.regularServoAngleData, maxLag )
-                    a[1][ rowIdx, colIdx, :maxLag+1 ] = newArray
+                    #newArray = crossCorrelateComplete( 
+                       #a[0][ rowIdx, colIdx, : ],  self.regularServoAngleData, maxLag )
+                    #a[1][ rowIdx, colIdx, :maxLag+1 ] = newArray
                     
         
         
