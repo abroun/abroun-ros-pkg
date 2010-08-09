@@ -17,6 +17,10 @@ class OpticalFlowFilter:
         self.lastImageGray = None
 
     #---------------------------------------------------------------------------
+    def getLastImageGray( self ):
+        return self.lastImageGray
+
+    #---------------------------------------------------------------------------
     def calcOpticalFlowWidth( self, imageWidth ):
         return (imageWidth - self.opticalFlowBlockWidth)/self.opticalFlowBlockWidth
         
