@@ -288,7 +288,7 @@
     </collision>
 </link>
 <gazebo reference="${name}_gripper_base_link">
-    <material>Gazebo/BumpyMetal</material>
+    <material>Gazebo/RustySteel</material>
     <turnGravityOff>false</turnGravityOff>
     <selfCollide>true</selfCollide>
 </gazebo>
@@ -326,7 +326,7 @@
     </collision>
 </link>
 <gazebo reference="${name}_gripper_left_finger_link">
-    <material>Gazebo/BumpyMetal</material>
+    <material>Gazebo/RustySteel</material>
     <turnGravityOff>false</turnGravityOff>
     <selfCollide>true</selfCollide>
 </gazebo>
@@ -364,7 +364,7 @@
     </collision>
 </link>
 <gazebo reference="${name}_gripper_right_finger_link">
-    <material>Gazebo/BumpyMetal</material>
+    <material>Gazebo/RustySteel</material>
     <turnGravityOff>false</turnGravityOff>
     <selfCollide>true</selfCollide>
 </gazebo>

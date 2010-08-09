@@ -25,6 +25,8 @@ from lynxmotion_arm.SSC32Driver import ServoConfig
 from gaffa_teleop.RoboticArm import DHFrame, RoboticArm
 import sensor_msgs.msg
 
+from OpticalFlowFilter import OpticalFlowFilter
+
 def printTiming(func):
     def wrapper(*arg):
     
@@ -61,7 +63,7 @@ class MainWindow:
     
     GRIPPER_WAVE_FREQUENCY = 1.0    # Waves per second
     GRIPPER_NUM_WAVES = 3.0
-    GRIPPER_WAVE_AMPLITUDE = math.radians( 20.0 )
+    GRIPPER_WAVE_AMPLITUDE = math.radians( 20.0 )/4.0
  
     #---------------------------------------------------------------------------
     def __init__( self ):
@@ -86,6 +88,10 @@ class MainWindow:
         
         self.cameraImageTopic = rospy.Subscriber( "/camera/image", 
             sensor_msgs.msg.Image, self.cameraImageCallback )
+            
+        self.opticalFlowFilter = OpticalFlowFilter(
+            self.OPTICAL_FLOW_BLOCK_WIDTH, self.OPTICAL_FLOW_BLOCK_HEIGHT,
+            self.OPTICAL_FLOW_RANGE_WIDTH, self.OPTICAL_FLOW_RANGE_HEIGHT )
         
         # Setup the GUI        
         builder = gtk.Builder()
@@ -112,43 +118,6 @@ class MainWindow:
         gtk.main()
         
     #---------------------------------------------------------------------------
-    def createOpticalFlowStorage( self ):
-        
-        if self.lastImageGray == None:
-            raise Exception( "No image to measure for optical flow" )
-        
-        storageWidth = (self.lastImageGray.width - self.OPTICAL_FLOW_BLOCK_WIDTH)/self.OPTICAL_FLOW_BLOCK_WIDTH
-        storageHeight = (self.lastImageGray.height - self.OPTICAL_FLOW_BLOCK_HEIGHT)/self.OPTICAL_FLOW_BLOCK_HEIGHT
-        
-        if self.opticalFlowX == None \
-            or storageWidth != self.opticalFlowX.width \
-            or storageHeight != self.opticalFlowX.height:
-                
-            self.opticalFlowX = cv.CreateMat( storageHeight, storageWidth, cv.CV_32FC1 )
-
-        if self.opticalFlowY == None \
-            or storageWidth != self.opticalFlowY.width \
-            or storageHeight != self.opticalFlowY.height:
-                
-            self.opticalFlowY = cv.CreateMat( storageHeight, storageWidth, cv.CV_32FC1 )
-        
-    #---------------------------------------------------------------------------
-    #@printTiming
-    def calcOpticalFlow( self, curImageGray ):
-        if self.lastImageGray != None:
-                
-            self.createOpticalFlowStorage()
-            
-            cv.CalcOpticalFlowBM( self.lastImageGray, curImageGray, 
-                ( self.OPTICAL_FLOW_BLOCK_WIDTH, self.OPTICAL_FLOW_BLOCK_HEIGHT ),
-                ( self.OPTICAL_FLOW_BLOCK_WIDTH, self.OPTICAL_FLOW_BLOCK_HEIGHT ),
-                ( self.OPTICAL_FLOW_RANGE_WIDTH, self.OPTICAL_FLOW_RANGE_HEIGHT ),
-                0, self.opticalFlowX, self.opticalFlowY )
-            
-        # Save the current image
-        self.lastImageGray = curImageGray
-        
-    #---------------------------------------------------------------------------
     def cameraImageCallback( self, rosImage ):
         
         if rosImage.encoding == "rgb8" or rosImage.encoding == "bgr8":
@@ -165,7 +134,7 @@ class MainWindow:
                 cv.CvtColor( curImage, curImageGray, cv.CV_RGB2GRAY )
             
             # Look for optical flow between this image and the last one
-            self.calcOpticalFlow( curImageGray )
+            self.opticalFlowX, self.opticalFlowY = self.opticalFlowFilter.calcOpticalFlow( curImageGray )
             
             # Display the image
             self.cameraImagePixBuf = gtk.gdk.pixbuf_new_from_data( 

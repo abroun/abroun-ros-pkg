@@ -18,8 +18,8 @@
     <include filename="$(find gaffa_description)/urdf/maplin.urdf.xacro" />
 
     <property name="GAFFA_BASE_MASS" value="100" />
-    <property name="GAFFA_BASE_LENGTH" value="5" />
-    <property name="GAFFA_BASE_WIDTH" value="10" />
+    <property name="GAFFA_BASE_LENGTH" value="1" />
+    <property name="GAFFA_BASE_WIDTH" value="1" />
     <property name="GAFFA_BASE_HEIGHT" value="0.018" />
 
     <!-- Base Block -->
@@ -47,7 +47,7 @@
         </collision>
     </link>
     <gazebo reference="gaffa_base_block">
-        <material>Gazebo/WoodPallet</material>
+        <material>Gazebo/WoodFloor</material>
         <turnGravityOff>false</turnGravityOff>
         <selfCollide>true</selfCollide>
     </gazebo>

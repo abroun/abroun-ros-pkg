@@ -12,6 +12,7 @@ import math
 import random
 import os.path
 import time
+import copy
 
 import numpy as np
 import scipy.signal
@@ -33,7 +34,7 @@ from matplotlib.backends.backend_gtkagg import FigureCanvasGTKAgg as FigureCanva
 from matplotlib.backends.backend_gtkagg import NavigationToolbar2GTKAgg as NavigationToolbar
 
 from abroun_gtk_gui.widgets import SequenceControl
-from SignalDetector import SignalDetector
+from OpticalFlowFilter import OpticalFlowFilter
 
 def printTiming(func):
     def wrapper(*arg):
@@ -46,193 +47,15 @@ def printTiming(func):
         return res
 
     return wrapper
-
-class SignalDetector:
-    
-    #---------------------------------------------------------------------------
-    def __init__( self ):
-        pass
-    
-    #---------------------------------------------------------------------------
-    def convertOpenCVArrayListToPythonArrayofLists( self, openCVArrayList ):
-        
-        result = []
-        
-        numOpenCVArrays = len( openCVArrayList )
-        if numOpenCVArrays > 0:
-            arrayHeight = openCVArrayList[ 0 ].height
-            arrayWidth = openCVArrayList[ 0 ].width
-            
-            for rowIdx in range( arrayHeight ):
-                result.append( [] )
-                for colIdx in range( arrayWidth ):
-                    result[ rowIdx ].append( [] )
-                
-            for arrayIdx, array in enumerate( openCVArrayList ):
-                if array.height != arrayHeight or array.width != arrayWidth:
-                    print arrayIdx, array.height, arrayHeight, array.width, arrayWidth
-                    raise Exception( "All arrays should have the same width and height" )
-                
-                for y in range( arrayHeight ):
-                    for x in range( arrayWidth ):
-                        result[ y ][ x ].append( cv.Get2D( array, y, x )[ 0 ] )
-        
-        return result
-            
-    
-    #---------------------------------------------------------------------------
-    def crossCorrelateArray( self, inputSignal, outputSignalArray, maxLag = None ):
-        '''Cross correlates the input signal with an array of output signals
-        
-        Repeatedly calculates the correlation coefficient between the output 
-        signal array and a delayed version of the input signal
-        
-        Parameters
-        ----------
-        inputSignal : list
-            The input signal samples
-        outputSignalArrays : 2D array of lists
-            The output signal samples. The length of each list in this array 
-            must match the length of inputSignal
-        maxLag : int
-            The maximum number of samples to lag the input signal by. If this
-            is omitted then the lag will range from 0 to the length of the 
-            inputSignal list
-            
-        Returns
-        -------
-        correlationCoefficients : 2D array of lists
-            The correlation coefficients calculated for each of the lagged inputs
-            
-        Notes
-        -----
-        This is all horrifically inefficient...
-        '''
-        result = []
-        inputSignalLength = len( inputSignal )
-        
-        arrayHeight = len( outputSignalArray )
-        if arrayHeight > 0:
-            
-            arrayWidth = len( outputSignalArray[ 0 ] )
-            for row in outputSignalArray:
-                if len( row ) != arrayWidth:
-                    raise Exception( "Input array has rows of variable width" )
-                
-                resultRow = []
-                for outputSignal in row:
-                    if len( outputSignal ) != inputSignalLength:
-                        raise Exception( "Length of output signal should match length of input signal" )
-                    
-                    resultRow.append( self.crossCorrelateComplete(
-                        outputSignal, inputSignal, maxLag ) )
-                
-                result.append( resultRow )
-        
-        return result
-    
-    #-------------------------------------------------------------------------------
-    def covariance( self, x, y ):
-        numElements = len( x )
-        if numElements > 0:
-            eX = sum( x ) / numElements
-            eY = sum( y ) / numElements
-            eXY = sum( [ x[i]*y[i] for i in range( numElements ) ] ) / numElements
-            return eXY - eX*eY
-        else:
-            return 0.0
-    
-    #-------------------------------------------------------------------------------
-    def crossCorrelate( self, sequence, laggedSequence, lag ):
-        
-        acc = 0
-        sequenceLength = len( sequence )
-        laggedSequenceLength = len( laggedSequence )
-        
-        numSamples = min( sequenceLength - lag, laggedSequenceLength )
-        if numSamples > 0:
-            
-            testSequence = sequence[lag:lag+numSamples]
-            testLaggedSequence = laggedSequence[:numSamples]
-            
-            varX = self.covariance( testSequence, testSequence )
-            varY = self.covariance( testLaggedSequence, testLaggedSequence )
-            if varX <= 0.0 or varY <= 0.0:
-                return 0.0
-            else:
-                return self.covariance( testSequence, testLaggedSequence ) / math.sqrt( varX*varY )
-            
-        else:
-            return 0.0
-            
-    #-------------------------------------------------------------------------------
-    # Calculates the cross correlation of a sequence for all possible lags
-    def crossCorrelateComplete( self, sequence, laggedSequence, maxLag = None ):
-        
-        if maxLag != None:
-            numCorrelations = maxLag + 1
-        else:
-            numCorrelations = len( sequence )
-            
-        return [ self.crossCorrelate( sequence, laggedSequence, lag ) \
-            for lag in range( numCorrelations ) ]
-
-#-------------------------------------------------------------------------------
-def variance( x ):
-    numElements = len( x )
-    if numElements > 0:
-        eX = np.sum( x ) / numElements
-        eXX = np.sum( np.multiply( x, x ) ) / numElements
-        return eXX - eX*eX
-    else:
-        return 0.0
-
-#-------------------------------------------------------------------------------
-def covariance( x, y ):
-    numElements = len( x )
-    if numElements > 0:
-        eX = np.sum( x ) / numElements
-        eY = np.sum( y ) / numElements
-        eXY = np.sum( np.multiply( x, y ) ) / numElements
-        return eXY - eX*eY
-    else:
-        return 0.0
-            
-#-------------------------------------------------------------------------------
-def crossCorrelate( sequence, laggedSequence, lag ):
-    
-    acc = 0
-    sequenceLength = len( sequence )
-    laggedSequenceLength = len( laggedSequence )
-    
-    numSamples = min( sequenceLength - lag, laggedSequenceLength )
-    if numSamples > 0:
-        
-        testSequence = sequence[lag:lag+numSamples]
-        testLaggedSequence = laggedSequence[:numSamples]
-        
-        #print np.cov( testSequence, testLaggedSequence )[ 0, 1 ] - \
-        #    covariance( testSequence, testLaggedSequence )
-        #if covariance( testSequence, testLaggedSequence ) != 0.0:
-        #    sys.exit()
-        #return np.correlate( testSequence, testLaggedSequence )[ 0 ]
-        
-        return np.corrcoef( testSequence, testLaggedSequence )[ 0, 1 ]
-        
-        varX = np.cov( testSequence, testSequence )[ 0, 1 ]
-        varY = np.cov( testLaggedSequence, testLaggedSequence )[ 0, 1 ]
-        if varX <= 0.0 or varY <= 0.0:
-            return 0.0
-        else:
-            cc = np.cov( testSequence, testLaggedSequence )[ 0, 1 ] / math.sqrt( varX*varY )
-            print cc - np.corrcoef( testSequence, testLaggedSequence )[ 0, 1 ]
-        
-    else:
-        return 0.0
         
 #-------------------------------------------------------------------------------
 # Calculates the cross correlation of a sequence for all possible lags
-def crossCorrelateComplete( sequence, laggedSequence, maxLag = None, debug = False ):
+def crossCorrelateComplete( sequence, laggedSequence, maxLag = None ):
+
+    if maxLag != None:
+        numCorrelations = maxLag + 1
+    else:
+        numCorrelations = len( sequence )
 
     # x
     x = sequence
@@ -242,9 +65,6 @@ def crossCorrelateComplete( sequence, laggedSequence, maxLag = None, debug = Fal
 
     #var_x = np.divide( np.subtract( np.multiply( sum_x2, len_x ), np.square( sum_x ) ), np.square( len_x ) )
     var_x = np.subtract( np.multiply( sum_x2, len_x ), np.square( sum_x ) )
-
-    if debug:
-        print var_x
 
     # y
     y = laggedSequence
@@ -259,77 +79,19 @@ def crossCorrelateComplete( sequence, laggedSequence, maxLag = None, debug = Fal
     # xy
     sum_xy = np.correlate( x, y, mode="full" )[ len( x ) - 1: ]
     #cov_xy = np.divide( np.subtract( np.multiply( sum_xy, len_x ), np.multiply( sum_x, sum_y[::-1] ) ), np.square( len_x ) )
-    cov_xy = np.subtract( np.multiply( sum_xy[ : maxLag+1], len_x[ : maxLag+1] ), np.multiply( sum_x[ : maxLag+1], sum_y[::-1][ : maxLag+1] ) )
+    cov_xy = np.subtract( np.multiply( sum_xy[ : numCorrelations], len_x[ : numCorrelations] ), np.multiply( sum_x[ : maxLag+1], sum_y[::-1][ : numCorrelations] ) )
 
-    corrCoeff = np.divide( cov_xy, np.sqrt( np.multiply( var_x[ : maxLag+1], var_y[ ::-1 ][ : maxLag+1] ) ) )
+    corrCoeff = np.divide( cov_xy, np.sqrt( np.multiply( var_x[ : numCorrelations], var_y[ ::-1 ][ : numCorrelations] ) ) )
     corrCoeff[ np.logical_or( np.isnan( corrCoeff ), np.isinf( corrCoeff ) ) ] = 0.0
     
     return corrCoeff
+ 
+#-------------------------------------------------------------------------------   
+def isInputSignalPresent( maxCorrCoeffX, maxCorrCoeffY ):
     
-    
-    #if maxLag != None:
-        #numCorrelations = maxLag + 1
-    #else:
-        #numCorrelations = len( sequence )
-        
-    #result = np.ndarray( shape=(numCorrelations), dtype=np.float32 )
-    #for lag in range( numCorrelations ):
-        #result[ lag ] = crossCorrelate( sequence, laggedSequence, lag )
-        
-    #return result
-
-#-------------------------------------------------------------------------------
-class OpticalFlowFilter:
-    
-    #---------------------------------------------------------------------------
-    def __init__( self, 
-        opticalFlowBlockWidth, opticalFlowBlockHeight, 
-        opticalFlowRangeWidth, opticalFlowRangeHeight ):
+    return ( maxCorrCoeffX > 0.75 or maxCorrCoeffY > 0.75 \
+        or maxCorrCoeffX + maxCorrCoeffY > 1.2 )
             
-        self.opticalFlowBlockWidth = opticalFlowBlockWidth
-        self.opticalFlowBlockHeight = opticalFlowBlockHeight
-        self.opticalFlowRangeWidth = opticalFlowRangeWidth
-        self.opticalFlowRangeHeight = opticalFlowRangeHeight
-        
-        self.lastImageGray = None
-
-    #---------------------------------------------------------------------------
-    def calcOpticalFlowWidth( self, imageWidth ):
-        return (imageWidth - self.opticalFlowBlockWidth)/self.opticalFlowBlockWidth
-        
-    #---------------------------------------------------------------------------
-    def calcOpticalFlowHeight( self, imageHeight ):
-        return (imageHeight - self.opticalFlowBlockHeight)/self.opticalFlowBlockHeight
-        
-    #---------------------------------------------------------------------------
-    def calcOpticalFlow( self, curImageGray ):
-        
-        if curImageGray.channels != 1 or curImageGray.depth != 8:
-            raise Exception( "Only able to process gray-scale images" )
-        
-        if self.lastImageGray == None:
-            lastImageGray = curImageGray
-        else:
-            lastImageGray = self.lastImageGray
-        
-        # Create storage for the optical flow
-        storageWidth = self.calcOpticalFlowWidth( lastImageGray.width )
-        storageHeight = self.calcOpticalFlowHeight( lastImageGray.height )
-        
-        opticalFlowArrayX = cv.CreateMat( storageHeight, storageWidth, cv.CV_32FC1 )
-        opticalFlowArrayY = cv.CreateMat( storageHeight, storageWidth, cv.CV_32FC1 )
-            
-        cv.CalcOpticalFlowBM( lastImageGray, curImageGray, 
-            ( self.opticalFlowBlockWidth, self.opticalFlowBlockHeight ),
-            ( self.opticalFlowBlockWidth, self.opticalFlowBlockHeight ),
-            ( self.opticalFlowRangeWidth, self.opticalFlowRangeHeight ),
-            0, opticalFlowArrayX, opticalFlowArrayY )
-            
-        # Save the current image
-        self.lastImageGray = curImageGray
-        
-        return ( opticalFlowArrayX, opticalFlowArrayY )
-
 #-------------------------------------------------------------------------------
 # Normalises a sequence of numbers by subtracting the mean and then dividing
 # by the standard deviation. This means that the sequence is centred at 0 and
@@ -355,7 +117,7 @@ def normaliseSequence( sequence ):
     return result
     
 #-------------------------------------------------------------------------------
-def resampleSequence( sequenceTimes, sequenceData, newSequenceTimes ):
+def resampleSequence( sequenceData, sequenceTimes, newSequenceTimes ):
     
     # Construct a spline to represent the sequence
     tck = scipy.interpolate.splrep( sequenceTimes, sequenceData )
@@ -400,13 +162,13 @@ class MainWindow:
         servoAngleData = []
         self.cameraImages = []
         
-        self.signalDetector = SignalDetector()
         self.opticalFlowFilter = OpticalFlowFilter(
             self.OPTICAL_FLOW_BLOCK_WIDTH, self.OPTICAL_FLOW_BLOCK_HEIGHT,
             self.OPTICAL_FLOW_RANGE_WIDTH, self.OPTICAL_FLOW_RANGE_HEIGHT )
             
         # Create storage for the optical flow
         numImages = 0
+        lastCameraTime = None
         opticalFlowWidth = 0
         opticalFlowHeight = 0
         for topic, msg, t in rosrecord.logplayer( bagFilename ):
@@ -415,8 +177,13 @@ class MainWindow:
                 if numImages == 0:
                     opticalFlowWidth = self.opticalFlowFilter.calcOpticalFlowWidth( msg.width )
                     opticalFlowHeight = self.opticalFlowFilter.calcOpticalFlowHeight( msg.height )
+                    lastCameraTime = t
+                    numImages = 1
                     
-                numImages += 1
+                else:
+                    if t != lastCameraTime:
+                        numImages += 1
+                        lastCameraTime = t
         
         self.imageTimes = np.ndarray(shape=( numImages ), dtype=np.float32)
         opticalFlowArrayShape = ( opticalFlowHeight, opticalFlowWidth, numImages )
@@ -424,6 +191,8 @@ class MainWindow:
         self.opticalFlowArraysY = np.ndarray(shape=opticalFlowArrayShape, dtype=np.float32)
         imgIdx = 0
         
+        lastAngleTime = None
+        lastCameraTime = None
         
         # Extract messages from the bag
         startTime = None
@@ -433,50 +202,28 @@ class MainWindow:
                 
             bagTime = t - startTime
                 
-            if msg._type == "arm_driver_msgs/SetServoAngles":
+            if msg._type == "arm_driver_msgs/SetServoAngles" \
+                and bagTime != lastAngleTime:
+                
+                lastAngleTime = bagTime
                 servoAngleTimes.append( bagTime.to_sec() )
                 
                 servoAngle = msg.servoAngles[ 0 ].angle
                 servoAngleData.append( servoAngle )
                 
-            elif msg._type == "sensor_msgs/Image":
+            elif msg._type == "sensor_msgs/Image" \
+                and bagTime != lastCameraTime:
                 
                 opticalFlowArrayX, opticalFlowArrayY = self.processCameraImage( msg )
 
+                lastCameraTime = bagTime
                 self.imageTimes[ imgIdx ] = bagTime.to_sec()
                 self.cameraImages.append( msg )
                 
-                #print dir( cv )
-                #print dir( opticalFlowArrayX )
-                #opNumPy = cvAdaptors.Ipl2NumPy( opticalFlowArrayX )
-                cv.Set2D( opticalFlowArrayX, 0, 0, imgIdx%8 )
-                
-                
-                t1 = time.time()
-                
-                #np.put( self.opticalFlowArraysX, [ imgIdx ], np.array( opticalFlowArrayX ) )
-                #np.put( self.opticalFlowArraysY, [ imgIdx ], np.array( opticalFlowArrayY ) )
                 self.opticalFlowArraysX[ :, :, imgIdx ] = np.array( opticalFlowArrayX )
                 self.opticalFlowArraysY[ :, :, imgIdx ] = np.array( opticalFlowArrayY )
                 
                 imgIdx += 1
-                t2 = time.time()
-                
-                
-                #self.opFlowXNP.append( opNumPy )
-                #print 'Conversion took %0.3f ms' % ((t2-t1)*1000.0)
-                
-
-             
-
-        
-        print self.opticalFlowArraysX[ 0, 0 ]
-        print self.opticalFlowArraysX[ :, :, 187 ]
-
-         
-        #servoAngleVelocity = [ servoAngleData[ i ] - servoAngleData[ i - 1 ] for i in range( 1, len( servoAngleData ) ) ]
-        #servoAngleData = [ 0 ] + servoAngleVelocity
-        #servoAngleData[ -1 ] = 0
 
         # Construct regular sampled data from the input servo data
         servoAngleData = normaliseSequence( servoAngleData )
@@ -494,89 +241,61 @@ class MainWindow:
         npAngleTimes = np.concatenate( [ preTimes, np.array( servoAngleTimes ), postTimes ] )
         npAngleData = np.concatenate( [ preReadings, np.array( servoAngleData ), postReadings ] )
         
-        self.A = servoAngleTimes
-        self.B = servoAngleData
-        
         self.regularServoAngleData = resampleSequence( 
-            npAngleTimes, npAngleData, self.regularSampleTimes )
-            
-        tck = scipy.interpolate.splrep( npAngleTimes, npAngleData )
-
-        # evaluate spline, including interpolated points
-        self.regularServoAngleData = scipy.interpolate.splev(
-            np.array( self.regularSampleTimes ),tck)
-        t2 = time.time()
-        print 'Resampling took %0.3f ms' % ((t2-t1)*1000.0)
-        
-        #self.regularServoAngleData = resampleSequence( servoAngleTimes, servoAngleData, self.regularSampleTimes )
-        
-        t1 = time.time()
-        
-        regularOpticalFlowArrayShape = \
-            ( opticalFlowHeight, opticalFlowWidth, len( self.regularSampleTimes ) )
-        self.regularOpticalFlowArrayX = np.ndarray(shape=regularOpticalFlowArrayShape, dtype=np.float32)
-        self.regularOpticalFlowArrayY = np.ndarray(shape=regularOpticalFlowArrayShape, dtype=np.float32)
-        
-        for a in [ ( self.opticalFlowArraysX, self.regularOpticalFlowArrayX ), 
-            ( self.opticalFlowArraysY, self.regularOpticalFlowArrayY ) ]:
-                
-            for rowIdx in range( a[0].shape[ 0 ] ):
-                for colIdx in range( a[0].shape[ 1 ] ):
-                                        
-                    newArray = resampleSequence( self.imageTimes, a[0][ rowIdx, colIdx, : ], self.regularSampleTimes )
-                    #print newArray
-                    a[1][ rowIdx, colIdx, : ] = newArray
+            npAngleData, npAngleTimes, self.regularSampleTimes )
+                    
+        self.regularOpticalFlowArrayX = np.apply_along_axis( resampleSequence, 2, 
+            self.opticalFlowArraysX, self.imageTimes, self.regularSampleTimes )
+        self.regularOpticalFlowArrayY = np.apply_along_axis( resampleSequence, 2, 
+            self.opticalFlowArraysY, self.imageTimes, self.regularSampleTimes )
         
         t2 = time.time()
         print 'Resampling took %0.3f ms' % ((t2-t1)*1000.0)
-        
-        cor = np.correlate( self.regularServoAngleData,
-            self.regularOpticalFlowArrayX[ 0, 0 ], mode="full" )
-        print cor
-        print len( cor ), len( self.regularServoAngleData )
                     
         t1 = time.time()
-        #self.correlationsX = self.signalDetector.crossCorrelateArray( 
-        #    self.regularServoAngleData, self.regularOpticalFlowArrayX,
-        #    int ( 1.0*self.SAMPLES_PER_SECOND ) )
-        #self.correlationsY = self.signalDetector.crossCorrelateArray( 
-        #    self.regularServoAngleData, self.regularOpticalFlowArrayY,
-        #    int ( 1.0*self.SAMPLES_PER_SECOND ) )
         
         maxLag = int( 1.0 * self.SAMPLES_PER_SECOND )
         self.correlationsX = np.apply_along_axis( crossCorrelateComplete, 2, 
             self.regularOpticalFlowArrayX, self.regularServoAngleData, maxLag )
         self.correlationsY = np.apply_along_axis( crossCorrelateComplete, 2, 
             self.regularOpticalFlowArrayY, self.regularServoAngleData, maxLag )
-            
-        crossCorrelateComplete( self.regularOpticalFlowArrayX[ 16, 32 ], 
-            self.regularServoAngleData, maxLag, True )
-
-        #self.correlationsX = cor2( np.array( self.regularServoAngleData ), 
-        #    np.array( self.regularServoAngleData ) ) #, 30 )
-        #self.correlationsX = np.ndarray(shape=regularOpticalFlowArrayShape, dtype=np.float32)
-        #self.correlationsY = np.ndarray(shape=regularOpticalFlowArrayShape, dtype=np.float32)
-        
-        
-        #for a in [ #( self.regularOpticalFlowArrayX, self.correlationsX ), 
-            #( self.regularOpticalFlowArrayY, self.correlationsY ) ]:
-                
-            #for rowIdx in range( a[0].shape[ 0 ] ):
-                #for colIdx in range( a[0].shape[ 1 ] ):
-                                        
-                    ##newArray = np.correlate(
-                    ##    self.regularServoAngleData, a[0][ rowIdx, colIdx, : ], mode="full" )
-                    ##print newArray
-                    ##a[1][ rowIdx, colIdx, : ] = newArray[ a[0].shape[ 2 ] - 1 : ]
-                    
-                    #newArray = crossCorrelateComplete( 
-                       #a[0][ rowIdx, colIdx, : ],  self.regularServoAngleData, maxLag )
-                    #a[1][ rowIdx, colIdx, :maxLag+1 ] = newArray
-                    
-        
         
         t2 = time.time()
         print 'Correlation took %0.3f ms' % ((t2-t1)*1000.0)
+        
+        # Detect the input signal based on the correlation in the x and y axis
+        maxCorrelationArrayX = np.maximum.reduce( np.absolute( self.correlationsX ), axis=2 )
+        maxCorrelationArrayY = np.maximum.reduce( np.absolute( self.correlationsY ), axis=2 )
+        self.inputSignalDetectedArray = np.frompyfunc( isInputSignalPresent, 2, 1 )(
+            maxCorrelationArrayX, maxCorrelationArrayY )
+          
+        # Build a histogram for the gripper  
+        self.gripperHistogram = cv.CreateHist( 
+            [ 256/8, 256/8, 256/8 ], cv.CV_HIST_ARRAY, [ (0,255), (0,255), (0,255) ], 1 )
+            
+        imageRGB = cv.CreateImageHeader( ( self.cameraImages[ 0 ].width, self.cameraImages[ 0 ].height ), cv.IPL_DEPTH_8U, 3 )
+        cv.SetData( imageRGB, self.cameraImages[ 0 ].data, self.cameraImages[ 0 ].step )
+            
+        r_plane = cv.CreateMat( imageRGB.height, imageRGB.width, cv.CV_8UC1 )
+        g_plane = cv.CreateMat( imageRGB.height, imageRGB.width, cv.CV_8UC1 )
+        b_plane = cv.CreateMat( imageRGB.height, imageRGB.width, cv.CV_8UC1 )
+        cv.Split( imageRGB, r_plane, g_plane, b_plane, None )
+        planes = [ r_plane, g_plane, b_plane ]
+
+        maskArray = np.zeros(shape=( imageRGB.height, imageRGB.width ), dtype=np.uint8 )
+        for rowIdx in range( self.inputSignalDetectedArray.shape[ 0 ] ):
+            for colIdx in range( self.inputSignalDetectedArray.shape[ 1 ] ):
+                
+                if self.inputSignalDetectedArray[ rowIdx, colIdx ]:
+                    rowStartIdx = rowIdx*self.OPTICAL_FLOW_BLOCK_HEIGHT
+                    rowEndIdx = rowStartIdx + self.OPTICAL_FLOW_BLOCK_HEIGHT
+                    colStartIdx = colIdx*self.OPTICAL_FLOW_BLOCK_WIDTH
+                    colEndIdx = colStartIdx + self.OPTICAL_FLOW_BLOCK_WIDTH
+                    
+                    maskArray[ rowStartIdx:rowEndIdx, colStartIdx:colEndIdx ] = 255
+
+        cv.CalcHist( [ cv.GetImage( i ) for i in planes ], 
+            self.gripperHistogram, 0, mask=maskArray )
         
         # Create the matplotlib graph
         self.figure = Figure( figsize=(8,6), dpi=72 )
@@ -628,57 +347,6 @@ class MainWindow:
         testX = int( self.adjTestPointX.get_value() )
         testY = int( self.adjTestPointY.get_value() )
         
-        # Extract optical flow for the current test point
-        #opticalFlowDataX = []
-        #opticalFlowDataY = []
-        
-        #for frameIdx in range( len( self.imageTimes ) ):
-            
-            #opticalFlowX = self.opticalFlowArraysX[ frameIdx ]
-            #opticalFlowY = self.opticalFlowArraysY[ frameIdx ]
-            
-            #if opticalFlowX == None or opticalFlowY == None:
-                #flowX = 0.0
-                #flowY = 0.0
-            #else:
-                #flowX = cv.Get2D( self.opticalFlowArraysX[ frameIdx ], 
-                    #testY, testX )[ 0 ] / self.OPTICAL_FLOW_BLOCK_WIDTH
-                #flowY = cv.Get2D( self.opticalFlowArraysY[ frameIdx ], 
-                    #testY, testX )[ 0 ] / self.OPTICAL_FLOW_BLOCK_HEIGHT
-                    
-                ##if testX > 12:
-                ##    flowX /= 8.0
-                #flowY = -flowY
-            
-            #opticalFlowDataX.append( flowX )
-            #opticalFlowDataY.append( flowY )
-        
-        # Normalise and resample the optical flow data
-        #opticalFlowDataX = normaliseSequence( opticalFlowDataX )
-        #opticalFlowDataY = normaliseSequence( opticalFlowDataY )
-        #print opticalFlowDataY
-        
-        #regularOpticalFlowDataX = resampleSequence( self.imageTimes, opticalFlowDataX, self.regularSampleTimes )
-        #regularOpticalFlowDataY = resampleSequence( self.imageTimes, opticalFlowDataY, self.regularSampleTimes )
-        
-        #regularOpticalFlowDataX = [ self.regularServoAngleData[ i ]*(1.0+random.gauss( 0, 0.0 )) \
-        #    for i in range( len( self.regularServoAngleData ) ) ]
-        #regularOpticalFlowDataX = normaliseSequence( regularOpticalFlowDataX )
-        
-        #for i in range( 58 ):
-        #    regularOpticalFlowDataY[ i ] = random.gauss( 0, 0.4 )
-        #    regularOpticalFlowDataY[ 240 + i ] = random.gauss( 0, 0.4 )
-        
-        # Calculate correlation
-        #crossCorrelationOpticalFlowX = crossCorrelateComplete( 
-        #    regularOpticalFlowDataX, self.regularServoAngleData )
-        #evolvingCCOpticalFlowX = calculateEvolvingCrossCorrelation(
-        #    regularOpticalFlowDataX, self.regularServoAngleData, int( 0.45*self.SAMPLES_PER_SECOND ) )
-        #crossCorrelationOpticalFlowY = crossCorrelateComplete( 
-        #    regularOpticalFlowDataY, self.regularServoAngleData )
-        #evolvingCCOpticalFlowY = calculateEvolvingCrossCorrelation(
-        #    regularOpticalFlowDataY, self.regularServoAngleData, int( 0.45*self.SAMPLES_PER_SECOND ) )
-        
         regularOpticalFlowDataX = self.regularOpticalFlowArrayX[ testY ][ testX ]
         regularOpticalFlowDataX = normaliseSequence( regularOpticalFlowDataX )
         regularOpticalFlowDataY = self.regularOpticalFlowArrayY[ testY ][ testX ]
@@ -690,7 +358,6 @@ class MainWindow:
         # Plot graphs
         self.axisX.clear()
         self.axisX.plot( self.regularSampleTimes, self.regularServoAngleData )
-        #self.axisX.plot( self.A, self.B )
         self.axisX.plot( self.regularSampleTimes, regularOpticalFlowDataX )
         self.axisX.plot( self.regularSampleTimes[:len(crossCorrelationOpticalFlowX)], crossCorrelationOpticalFlowX )
         #self.axisX.plot( self.regularSampleTimes, evolvingCCOpticalFlowX )
@@ -756,14 +423,42 @@ class MainWindow:
         
         # Display the frame
         image = self.cameraImages[ frameIdx ]
+        #self.cameraImagePixBuf = gtk.gdk.pixbuf_new_from_data( 
+            #image.data, 
+            #gtk.gdk.COLORSPACE_RGB,
+            #False,
+            #8,
+            #image.width,
+            #image.height,
+            #image.step )
+            
+        # Track gripper
+        imageRGB = cv.CreateImageHeader( ( image.width, image.height ), cv.IPL_DEPTH_8U, 3 )
+        cv.SetData( imageRGB, image.data, image.step )
+        imageRGB = cv.CloneImage( imageRGB )
+            
+        r_plane = cv.CreateMat( imageRGB.height, imageRGB.width, cv.CV_8UC1 )
+        g_plane = cv.CreateMat( imageRGB.height, imageRGB.width, cv.CV_8UC1 )
+        b_plane = cv.CreateMat( imageRGB.height, imageRGB.width, cv.CV_8UC1 )
+        cv.Split( imageRGB, r_plane, g_plane, b_plane, None )
+        planes = [ r_plane, g_plane, b_plane ]
+        
+        backproject = cv.CreateImage(cv.GetSize(imageRGB), 8, 1)
+
+        # Run the cam-shift
+        cv.CalcArrBackProject( planes, backproject, self.gripperHistogram )
+        #cv.Threshold( backproject, backproject, 1, 255, cv.CV_THRESH_BINARY )
+        cv.CvtColor( backproject, imageRGB, cv.CV_GRAY2RGB )
+        
         self.cameraImagePixBuf = gtk.gdk.pixbuf_new_from_data( 
-            image.data, 
+            imageRGB.tostring(), 
             gtk.gdk.COLORSPACE_RGB,
             False,
             8,
-            image.width,
-            image.height,
-            image.step )
+            imageRGB.width,
+            imageRGB.height,
+            imageRGB.width*3 )
+        
 
         # Resize the drawing area if necessary
         if self.dwgCameraImage.get_size_request() != ( image.width, image.height ):
@@ -811,7 +506,33 @@ class MainWindow:
             widget.window.draw_pixbuf( widget.get_style().fg_gc[ gtk.STATE_NORMAL ],
                 self.cameraImagePixBuf, srcX, srcY, 
                 imgRect.x, imgRect.y, imgRect.width, imgRect.height )
+               
+            return
+               
+            # Draw an overlay to show places where the input motion has been detected
+            if self.inputSignalDetectedArray != None:
                 
+                graphicsContext = widget.window.new_gc()
+                graphicsContext.set_rgb_fg_color( gtk.gdk.Color( 65535, 65535, 0 ) )
+                
+                blockY = imgRect.y
+                for y in range( self.inputSignalDetectedArray.shape[ 0 ] ):
+                
+                    blockX = imgRect.x
+                    for x in range( self.inputSignalDetectedArray.shape[ 1 ] ):
+                        
+                        if self.inputSignalDetectedArray[ y, x ]:
+                            points = [ (blockX+int((i*2)%self.OPTICAL_FLOW_BLOCK_WIDTH), blockY+2*int((i*2)/self.OPTICAL_FLOW_BLOCK_WIDTH)) \
+                                for i in range( self.OPTICAL_FLOW_BLOCK_WIDTH*self.OPTICAL_FLOW_BLOCK_HEIGHT/4 ) ]
+                                
+                            widget.window.draw_points( graphicsContext, points )
+                            
+                        blockX += self.OPTICAL_FLOW_BLOCK_WIDTH
+                        
+                    blockY += self.OPTICAL_FLOW_BLOCK_HEIGHT
+             
+            #return
+               
             # Draw the optical flow if it's available
             opticalFlowX = self.opticalFlowArraysX[ :, :, self.frameIdx ]
             opticalFlowY = self.opticalFlowArraysY[ :, :, self.frameIdx ]
