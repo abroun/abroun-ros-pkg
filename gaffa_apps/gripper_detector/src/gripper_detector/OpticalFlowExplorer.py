@@ -240,7 +240,8 @@ def crossCorrelateComplete( sequence, laggedSequence, maxLag = None, debug = Fal
     sum_x2 = np.add.accumulate( np.square( x )[ ::-1 ] )[ ::-1 ] 
     len_x = np.arange( len( x ), 0, -1 )
 
-    var_x = np.divide( np.subtract( np.multiply( sum_x2, len_x ), np.square( sum_x ) ), np.square( len_x ) )
+    #var_x = np.divide( np.subtract( np.multiply( sum_x2, len_x ), np.square( sum_x ) ), np.square( len_x ) )
+    var_x = np.subtract( np.multiply( sum_x2, len_x ), np.square( sum_x ) )
 
     if debug:
         print var_x
@@ -252,13 +253,15 @@ def crossCorrelateComplete( sequence, laggedSequence, maxLag = None, debug = Fal
     sum_y2 = np.add.accumulate( np.square( y ) )
     len_y = np.arange( 1, len( y ) + 1, 1 )
 
-    var_y = np.divide( np.subtract( np.multiply( sum_y2, len_y ), np.square( sum_y ) ), np.square( len_y ) )
+    #var_y = np.divide( np.subtract( np.multiply( sum_y2, len_y ), np.square( sum_y ) ), np.square( len_y ) )
+    var_y = np.subtract( np.multiply( sum_y2, len_y ), np.square( sum_y ) )
 
     # xy
     sum_xy = np.correlate( x, y, mode="full" )[ len( x ) - 1: ]
-    cov_xy = np.divide( np.subtract( np.multiply( sum_xy, len_x ), np.multiply( sum_x, sum_y[::-1] ) ), np.square( len_x ) )
+    #cov_xy = np.divide( np.subtract( np.multiply( sum_xy, len_x ), np.multiply( sum_x, sum_y[::-1] ) ), np.square( len_x ) )
+    cov_xy = np.subtract( np.multiply( sum_xy[ : maxLag+1], len_x[ : maxLag+1] ), np.multiply( sum_x[ : maxLag+1], sum_y[::-1][ : maxLag+1] ) )
 
-    corrCoeff = np.divide( cov_xy, np.sqrt( np.multiply( var_x, var_y[ ::-1 ] ) ) )
+    corrCoeff = np.divide( cov_xy, np.sqrt( np.multiply( var_x[ : maxLag+1], var_y[ ::-1 ][ : maxLag+1] ) ) )
     corrCoeff[ np.logical_or( np.isnan( corrCoeff ), np.isinf( corrCoeff ) ) ] = 0.0
     
     return corrCoeff
