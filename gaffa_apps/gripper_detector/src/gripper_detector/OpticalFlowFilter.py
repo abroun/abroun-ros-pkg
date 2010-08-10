@@ -22,11 +22,11 @@ class OpticalFlowFilter:
 
     #---------------------------------------------------------------------------
     def calcOpticalFlowWidth( self, imageWidth ):
-        return (imageWidth - self.opticalFlowBlockWidth)/self.opticalFlowBlockWidth
+        return int((imageWidth - self.opticalFlowBlockWidth)/self.opticalFlowBlockWidth)
         
     #---------------------------------------------------------------------------
     def calcOpticalFlowHeight( self, imageHeight ):
-        return (imageHeight - self.opticalFlowBlockHeight)/self.opticalFlowBlockHeight
+        return int((imageHeight - self.opticalFlowBlockHeight)/self.opticalFlowBlockHeight)
         
     #---------------------------------------------------------------------------
     def calcOpticalFlow( self, curImageGray ):

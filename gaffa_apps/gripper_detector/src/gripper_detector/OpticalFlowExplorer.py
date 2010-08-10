@@ -227,7 +227,7 @@ class MainWindow:
 
         # Construct regular sampled data from the input servo data
         servoAngleData = normaliseSequence( servoAngleData )
-        dataDuration = math.ceil( max( servoAngleTimes[ -1 ], self.imageTimes[ -1 ] ) )
+        dataDuration = math.floor( self.imageTimes[ -1 ] )
         
         self.regularSampleTimes = np.arange( 0.0, dataDuration, 1.0/self.SAMPLES_PER_SECOND )
         
@@ -235,7 +235,7 @@ class MainWindow:
         # Pad the servo readings with zeros at the start and end
         preTimes = np.arange( 0.0, servoAngleTimes[ 0 ], 0.1 )
         preReadings = np.zeros( len( preTimes ) )
-        postTimes = np.arange( servoAngleTimes[ -1 ] + 0.1, dataDuration, 0.1 )
+        postTimes = np.arange( servoAngleTimes[ -1 ] + 0.1, dataDuration + 1.0, 0.1 )
         postReadings = np.zeros( len( postTimes ) )
         
         npAngleTimes = np.concatenate( [ preTimes, np.array( servoAngleTimes ), postTimes ] )
@@ -362,6 +362,14 @@ class MainWindow:
         self.axisX.plot( self.regularSampleTimes[:len(crossCorrelationOpticalFlowX)], crossCorrelationOpticalFlowX )
         #self.axisX.plot( self.regularSampleTimes, evolvingCCOpticalFlowX )
         
+        opticalFlowDataX = self.opticalFlowArraysX[ testY ][ testX ]
+        opticalFlowDataX = normaliseSequence( opticalFlowDataX )
+        blah = resampleSequence( opticalFlowDataX, self.imageTimes, self.regularSampleTimes )
+        blah = normaliseSequence( blah )
+        print max( self.imageTimes ), max( self.regularSampleTimes ) 
+        self.axisX.plot( self.imageTimes, opticalFlowDataX )
+        #self.axisX.plot( self.regularSampleTimes, blah )
+        
         self.axisY.clear()
         self.axisY.plot( self.regularSampleTimes, self.regularServoAngleData )
         self.axisY.plot( self.regularSampleTimes, regularOpticalFlowDataY )
@@ -423,14 +431,14 @@ class MainWindow:
         
         # Display the frame
         image = self.cameraImages[ frameIdx ]
-        #self.cameraImagePixBuf = gtk.gdk.pixbuf_new_from_data( 
-            #image.data, 
-            #gtk.gdk.COLORSPACE_RGB,
-            #False,
-            #8,
-            #image.width,
-            #image.height,
-            #image.step )
+        self.cameraImagePixBuf = gtk.gdk.pixbuf_new_from_data( 
+            image.data, 
+            gtk.gdk.COLORSPACE_RGB,
+            False,
+            8,
+            image.width,
+            image.height,
+            image.step )
             
         # Track gripper
         imageRGB = cv.CreateImageHeader( ( image.width, image.height ), cv.IPL_DEPTH_8U, 3 )
@@ -450,14 +458,14 @@ class MainWindow:
         #cv.Threshold( backproject, backproject, 1, 255, cv.CV_THRESH_BINARY )
         cv.CvtColor( backproject, imageRGB, cv.CV_GRAY2RGB )
         
-        self.cameraImagePixBuf = gtk.gdk.pixbuf_new_from_data( 
-            imageRGB.tostring(), 
-            gtk.gdk.COLORSPACE_RGB,
-            False,
-            8,
-            imageRGB.width,
-            imageRGB.height,
-            imageRGB.width*3 )
+        #self.cameraImagePixBuf = gtk.gdk.pixbuf_new_from_data( 
+            #imageRGB.tostring(), 
+            #gtk.gdk.COLORSPACE_RGB,
+            #False,
+            #8,
+            #imageRGB.width,
+            #imageRGB.height,
+            #imageRGB.width*3 )
         
 
         # Resize the drawing area if necessary
@@ -506,8 +514,6 @@ class MainWindow:
             widget.window.draw_pixbuf( widget.get_style().fg_gc[ gtk.STATE_NORMAL ],
                 self.cameraImagePixBuf, srcX, srcY, 
                 imgRect.x, imgRect.y, imgRect.width, imgRect.height )
-               
-            return
                
             # Draw an overlay to show places where the input motion has been detected
             if self.inputSignalDetectedArray != None:

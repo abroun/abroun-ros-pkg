@@ -215,9 +215,10 @@ class MainWindow:
                 # Run the cam-shift
                 cv.CalcArrBackProject( planes, backproject, self.gripperHistogram )
                 
-                crit = ( cv.CV_TERMCRIT_EPS | cv.CV_TERMCRIT_ITER, 10, 1)
-                (iters, (area, value, rect), track_box) = cv.CamShift(backproject, self.gripperTrackWindow, crit)
-                self.gripperTrackWindow = rect
+                if self.gripperTrackWindow[ 2 ] > 0 and self.gripperTrackWindow[ 3 ] > 0:
+                    crit = ( cv.CV_TERMCRIT_EPS | cv.CV_TERMCRIT_ITER, 10, 1)
+                    (iters, (area, value, rect), track_box) = cv.CamShift(backproject, self.gripperTrackWindow, crit)
+                    self.gripperTrackWindow = rect
                 
                 print self.gripperTrackWindow
                 
@@ -526,7 +527,7 @@ class MainWindow:
                             self.tryingToDetectGripper = False
                             self.btnDetectGripper.set_sensitive( True )
                             
-                        elif self.curSampleIdx >= gripperDetectionWaveStartSampleIdx \
+                        elif gripperDetectionSampleIdx >= gripperDetectionWaveStartSampleIdx \
                             and not self.gripperDetectionWaveStarted:
                             
                             self.gripperDetectionWaveStarted = self.tryToStartWavingGripper()
