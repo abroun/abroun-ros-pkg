@@ -98,6 +98,12 @@ def getArmServoConfig():
     return servoConfigDict
 
 #-------------------------------------------------------------------------------
+class ArmPos:
+    def __init__( self, servoAnglesDict, screenPos ):
+        self.servoAnglesDict = servoAnglesDict
+        self.screenPos = screenPos
+
+#-------------------------------------------------------------------------------
 class MainWindow:
     
     OPTICAL_FLOW_BLOCK_WIDTH = 8
@@ -114,6 +120,33 @@ class MainWindow:
     MAX_CORRELATION_LAG = 1.0
     GRIPPER_DETECTION_TIME = 8.0    # Should be less than BUFFER_TIME_LENGTH
     GRIPPER_DETECTION_WAVE_START_TIME = 2.5
+    
+    TEST_ARM_POSITIONS = [
+        ArmPos( {
+            "base_rotate" : math.radians( 0.69 ), 
+            "shoulder_rotate" : math.radians( 75.99 ), 
+            "elbow_rotate" : math.radians( -97.34 ), 
+            "wrist_rotate" : math.radians( 80.05 ),
+            "gripper_rotate" : math.radians( -0.03 ) },
+            ( 100, 85 ) ),
+        ArmPos( {
+            "base_rotate" : math.radians( 23.96 ), 
+            "shoulder_rotate" : math.radians( 72.59 ), 
+            "elbow_rotate" : math.radians( -107.21 ), 
+            "wrist_rotate" : math.radians( 87.14 ),
+            "gripper_rotate" : math.radians( -67.23 ) },
+            ( 97, 170 ) ),
+        ArmPos( {
+            "base_rotate" : math.radians( -41.24 ), 
+            "shoulder_rotate" : math.radians( 57.32 ), 
+            "elbow_rotate" : math.radians( -116.48 ), 
+            "wrist_rotate" : math.radians( 130.12 ),
+            "gripper_rotate" : math.radians( 0.00 ) },
+            ( 247, 165 ) ) ]
+     
+    # Locating Positions states
+    LPS_MOVING_TO_TEST_POS = "MovingToTestPos"
+    LPS_DETECTING_GRIPPER = "DetectingGripper"
  
     #---------------------------------------------------------------------------
     def __init__( self ):
@@ -128,6 +161,8 @@ class MainWindow:
         self.tryingToDetectGripper = False
         self.gripperWaveStartTime = None
         self.lastImage = None
+        self.curTestPosIdx = 0
+        self.locatingPositions = False
         
         self.wristAngle = 0.0
             
@@ -220,7 +255,7 @@ class MainWindow:
                     (iters, (area, value, rect), track_box) = cv.CamShift(backproject, self.gripperTrackWindow, crit)
                     self.gripperTrackWindow = rect
                 
-                print self.gripperTrackWindow
+                #print self.gripperTrackWindow
                 
                 if self.checkShowGripperProbability.get_active():
                     #cv.Threshold( backproject, backproject, 1, 255, cv.CV_THRESH_BINARY )
@@ -274,45 +309,64 @@ class MainWindow:
 
         else:
             rospy.logerr( "Unhandled image encoding - " + rosImage.encoding )
+    
+    #---------------------------------------------------------------------------
+    def moveArmToJointAnglePosition( self, servoAnglesDict, jointSpeed ):
         
+        self.wristAngle = servoAnglesDict[ "wrist_rotate" ]
+        self.roboticArm.setJointAngles( servoAnglesDict, jointSpeed )
+    
     #---------------------------------------------------------------------------
     def onBtnGotoSafePosClicked( self, widget, data = None ):
         
-        if not self.tryingToDetectGripper:
-            servoAnglesDict = {
-                "base_rotate" : 0.02389963168290073, 
-                "shoulder_rotate" : 2.3561944901923448, 
-                "elbow_rotate" : -2.748893571891069, 
-                "wrist_rotate" : 1.9583014768641922,
-                "gripper_rotate" : -0.0004890796739715704
-            }
-            
-            self.wristAngle = servoAnglesDict[ "wrist_rotate" ]
-            
-            self.roboticArm.setJointAngles( servoAnglesDict, math.radians( 2.5 ) )
+        self.tryingToDetectGripper = False
+        self.locatingPositions = False
         
+        servoAnglesDict = {
+            "base_rotate" : 0.02389963168290073, 
+            "shoulder_rotate" : 2.3561944901923448, 
+            "elbow_rotate" : -2.748893571891069, 
+            "wrist_rotate" : 1.9583014768641922,
+            "gripper_rotate" : -0.0004890796739715704
+        }
+
+        self.moveArmToJointAnglePosition( servoAnglesDict, math.radians( 1.5 ) )
+    
     #---------------------------------------------------------------------------
     def onBtnGotoExperimentPosClicked( self, widget, data = None ):
   
-        if not self.tryingToDetectGripper:
-            servoAnglesDict = {
-                "base_rotate" : 0.43528090983473017, 
-                "shoulder_rotate" : 1.8248153311815414, 
-                "elbow_rotate" : -2.0368307791722984, 
-                "wrist_rotate" : 1.2301417017068466,
-                "gripper_rotate" : -0.0004890796739715704
-            }
-            
-            self.wristAngle = servoAnglesDict[ "wrist_rotate" ]
-            
-            self.roboticArm.setJointAngles( servoAnglesDict, math.radians( 2.5 ) )
+        self.tryingToDetectGripper = False
+        self.locatingPositions = False
+        
+        servoAnglesDict = {
+            "base_rotate" : 0.43528090983473017, 
+            "shoulder_rotate" : 1.8248153311815414, 
+            "elbow_rotate" : -2.0368307791722984, 
+            "wrist_rotate" : 1.2301417017068466,
+            "gripper_rotate" : -0.0004890796739715704
+        }
+        
+        self.moveArmToJointAnglePosition( servoAnglesDict, math.radians( 1.5 ) )
     
     #---------------------------------------------------------------------------
     def onBtnWaveGripperClicked( self, widget, data = None ):
         
-        if not self.tryingToDetectGripper:
-            self.tryToStartWavingGripper()
+        self.tryingToDetectGripper = False
+        self.locatingPositions = False
+        
+        self.tryToStartWavingGripper()
 
+    #---------------------------------------------------------------------------
+    def startToDetectGripper( self ):
+        
+        self.inputSignalDetectedArray = None
+        self.gripperHistogram = None
+        self.gripperTrackWindow = None
+        self.gripperDetectionStartSampleIdx = self.curSampleIdx
+        self.gripperDetectionWaveStarted = False
+        self.btnDetectGripper.set_sensitive( False )
+        self.tryingToDetectGripper = True
+        
     #---------------------------------------------------------------------------
     def onBtnDetectGripperClicked( self, widget, data = None ):
         
@@ -320,14 +374,25 @@ class MainWindow:
             and not self.tryingToDetectGripper \
             and not self.wavingGripper:
             
-            self.inputSignalDetectedArray = None
-            self.gripperHistogram = None
-            self.gripperTrackWindow = None
-            self.gripperDetectionStartSampleIdx = self.curSampleIdx
-            self.gripperDetectionWaveStarted = False
-            self.btnDetectGripper.set_sensitive( False )
-            self.tryingToDetectGripper = True
-      
+            self.locatingPositions = False
+            self.startToDetectGripper()
+     
+    #---------------------------------------------------------------------------
+    def onBtnLocatePositionsClicked( self, widget, data = None ):
+        
+        if self.dataBuffersSetup \
+            and not self.locatingPositions \
+            and not self.tryingToDetectGripper \
+            and not self.wavingGripper:
+                
+            self.curTestPosIdx = 0
+            self.testPosMeasurements = []
+            for i in range( len( self.TEST_ARM_POSITIONS ) ):
+                self.testPosMeasurements.append( [] )
+                
+            self.locatingPositions = True
+            self.moveToTestPosition( self.curTestPosIdx )
+     
     #---------------------------------------------------------------------------
     def onDwgCameraImageExposeEvent( self, widget, data = None ):
         
@@ -406,7 +471,8 @@ class MainWindow:
                         blockCentreX += self.OPTICAL_FLOW_BLOCK_WIDTH
                         
                     blockCentreY += self.OPTICAL_FLOW_BLOCK_HEIGHT    
-                    
+                   
+            # Draw the CAMShift tracking window
             if self.checkShowCAMShiftTracking.get_active() \
                 and self.gripperTrackWindow != None:
                     
@@ -416,6 +482,50 @@ class MainWindow:
                 widget.window.draw_rectangle( graphicsContext, False,
                     self.gripperTrackWindow[ 0 ], self.gripperTrackWindow[ 1 ],
                     self.gripperTrackWindow[ 2 ], self.gripperTrackWindow[ 3 ] )
+                    
+            # Draw the results of trying to locate positions on the screen using
+            # the detect gripper routine
+            if self.locatingPositions:
+                
+                realWorldPoints = [ p.screenPos for p in self.TEST_ARM_POSITIONS ]
+                measuredPoints = []
+                averagePoints = []
+                
+                for posIdx in range( len( self.TEST_ARM_POSITIONS ) ):
+                    posMeasuredPoints = self.testPosMeasurements[ posIdx ]
+                    numMeasuredPoints = len( posMeasuredPoints )
+                    
+                    if numMeasuredPoints > 0:
+                        measuredPoints += posMeasuredPoints
+                        
+                        accX = 0
+                        accY = 0
+                        for p in posMeasuredPoints:
+                            accX += p[ 0 ]
+                            accY += p[ 1 ]
+                        averagePoints.append( ( int( accX / numMeasuredPoints ), int( accY / numMeasuredPoints ) ) )
+                
+                graphicsContext = widget.window.new_gc()
+                graphicsContext.set_rgb_fg_color( gtk.gdk.Color( 65535, 65535, 65535 ) )
+                self.drawCircles( widget, graphicsContext, realWorldPoints, 2, True )
+                
+                graphicsContext.set_rgb_fg_color( gtk.gdk.Color( 0, 65535, 0 ) )
+                self.drawCircles( widget, graphicsContext, measuredPoints, 2, True )
+                
+                graphicsContext.set_rgb_fg_color( gtk.gdk.Color( 65535, 0, 0 ) )
+                self.drawCircles( widget, graphicsContext, averagePoints, 2, True )
+
+    #---------------------------------------------------------------------------
+    def drawCircles( self, widget, graphicsContext, circleCentres, radius, filled ):
+        
+        for circleCentre in circleCentres:
+            
+            arcX = int( circleCentre[ 0 ] - radius )
+            arcY = int( circleCentre[ 1 ] - radius )
+            arcWidth = arcHeight = int( radius * 2 )
+        
+            widget.window.draw_arc( graphicsContext, 
+                filled, arcX, arcY, arcWidth, arcHeight, 0, 360 * 64 )
 
     #---------------------------------------------------------------------------
     def getImageRectangleInWidget( self, widget, imageWidth, imageHeight ):
@@ -434,6 +544,20 @@ class MainWindow:
             imgRect.height = imageHeight
         
         return imgRect
+
+    #---------------------------------------------------------------------------
+    def moveToTestPosition( self, testPosIdx ):
+        
+        if not self.locatingPositions:
+            raise Exception( "Not in correct state" )
+        
+        self.moveArmToJointAnglePosition( 
+            self.TEST_ARM_POSITIONS[ testPosIdx ].servoAnglesDict, 
+            math.radians( 1.5 ) )
+            
+        self.curTestPosIdx = testPosIdx
+        self.locatingPositionsState = self.LPS_MOVING_TO_TEST_POS
+        self.moveStartTime = time.clock()
 
     #---------------------------------------------------------------------------
     def update( self ):
@@ -531,6 +655,43 @@ class MainWindow:
                             and not self.gripperDetectionWaveStarted:
                             
                             self.gripperDetectionWaveStarted = self.tryToStartWavingGripper()
+
+                # Update the Locating Positions state machine
+                if self.locatingPositions:
+                    if self.locatingPositionsState == self.LPS_MOVING_TO_TEST_POS:
+                        
+                        if curTime - self.moveStartTime > 3.0:
+                            # Arm should have got to the position and settled by now
+                            self.startToDetectGripper()
+                            self.locatingPositionsState = self.LPS_DETECTING_GRIPPER
+                            
+                    elif self.locatingPositionsState == self.LPS_DETECTING_GRIPPER:
+                        
+                        if not self.tryingToDetectGripper:
+                            
+                            # Gripper detection has finished, measure the position of the gripper
+                            numDetectedSignals = 0
+                            accX = 0
+                            accY = 0
+                            
+                            for rowIdx in range( self.inputSignalDetectedArray.shape[ 0 ] ):
+                                
+                                rowY = rowIdx*self.OPTICAL_FLOW_BLOCK_HEIGHT + self.OPTICAL_FLOW_BLOCK_HEIGHT/2
+                                for colIdx in range( self.inputSignalDetectedArray.shape[ 1 ] ):
+                                
+                                    colX = colIdx*self.OPTICAL_FLOW_BLOCK_WIDTH + self.OPTICAL_FLOW_BLOCK_WIDTH/2
+                                    if self.inputSignalDetectedArray[ rowIdx, colIdx ]:
+                                        numDetectedSignals += 1
+                                        accX += colX
+                                        accY += rowY
+                            
+                            if numDetectedSignals > 0:
+                                measuredPos = ( accX / numDetectedSignals, accY / numDetectedSignals )
+                                self.testPosMeasurements[ self.curTestPosIdx ].append( measuredPos )
+                                
+                            # Now move on to the next test position
+                            newTestPosIdx = (self.curTestPosIdx + 1)%len( self.TEST_ARM_POSITIONS )
+                            self.moveToTestPosition( newTestPosIdx )
 
                 # Save the time
                 lastTime = curTime
