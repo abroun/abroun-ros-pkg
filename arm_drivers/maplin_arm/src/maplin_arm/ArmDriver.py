@@ -62,7 +62,7 @@ if not device is None:
     elbowMotor = MOTOR_OFF
     wristMotor = MOTOR_OFF
     gripperMotor = MOTOR_OFF
-    baseMotor = MOTOR_OFF
+    baseMotor = MOTOR_FORWARD
     
     dataBuffer = struct.pack( 'L', (shoulderMotor << 22) )# | b'\x00\x00\x00\x00'
     print "{0:X}".format( shoulderMotor << 22 )
@@ -76,7 +76,7 @@ if not device is None:
     deviceHandle.controlMsg( requestType=(usb.TYPE_VENDOR | usb.RECIP_DEVICE), 
         request=6, value=0x100, index=INTERFACE_IDX, buffer=dataBuffer, timeout=0 );
     
-    time.sleep( 0.005 )
+    time.sleep( 0.03 )
     
     dataBuffer = b'\x00\x00\x00'
     deviceHandle.controlMsg( requestType=(usb.TYPE_VENDOR | usb.RECIP_DEVICE), 

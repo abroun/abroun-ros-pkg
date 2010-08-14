@@ -80,7 +80,7 @@ def crossCorrelateComplete( sequence, laggedSequence, maxLag = None ):
 #-------------------------------------------------------------------------------   
 def isInputSignalPresent( maxCorrCoeffX, maxCorrCoeffY ):
     
-    return ( maxCorrCoeffX > 0.75 or maxCorrCoeffY > 0.75 \
+    return ( maxCorrCoeffX > 0.5 or maxCorrCoeffY > 0.5 \
         or maxCorrCoeffX + maxCorrCoeffY > 1.2 )
 
 #-------------------------------------------------------------------------------
