@@ -9,6 +9,8 @@
   <review status="unreviewed" notes=""/>
   <url></url>
 
+  <depend package="rospy" />
+  
   <rosdep name="pyusb"/>
 
 </package>

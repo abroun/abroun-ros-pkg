@@ -11,6 +11,8 @@
 
   <depend package="rospy" />
   <depend package="lynxmotion_arm" />
+  <depend package="maplin_arm" />
+  <depend package="sensor_msgs" />
 
 </package>
 

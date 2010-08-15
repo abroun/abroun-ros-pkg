@@ -323,7 +323,7 @@ class MainWindow:
         self.locatingPositions = False
         
         servoAnglesDict = {
-            "base_rotate" : 0.02389963168290073, 
+            "base_rotate" : math.radians( 72.65 ), 
             "shoulder_rotate" : 2.3561944901923448, 
             "elbow_rotate" : -2.748893571891069, 
             "wrist_rotate" : 1.9583014768641922,
@@ -339,7 +339,7 @@ class MainWindow:
         self.locatingPositions = False
         
         servoAnglesDict = {
-            "base_rotate" : 0.43528090983473017, 
+            "base_rotate" : math.radians( 72.65 ), 
             "shoulder_rotate" : 1.8248153311815414, 
             "elbow_rotate" : -2.0368307791722984, 
             "wrist_rotate" : 1.2301417017068466,

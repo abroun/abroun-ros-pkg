@@ -1,8 +1,5 @@
 # Directories
-bin
-build
-msg_gen
+lisp
 
 # Files
-*.pyc
 

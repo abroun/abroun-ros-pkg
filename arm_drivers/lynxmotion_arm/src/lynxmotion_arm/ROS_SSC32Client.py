@@ -9,7 +9,7 @@ from arm_driver_msgs.msg import *
 import time
 import math
 
-from SSC32Driver import SSC32Driver, ServoConfig
+from SSC32Driver import ServoConfig
 
 #-------------------------------------------------------------------------------
 class ROS_SSC32Client():

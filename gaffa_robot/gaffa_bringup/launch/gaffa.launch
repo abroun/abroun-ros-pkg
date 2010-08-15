@@ -1,12 +1,20 @@
 <launch>
 
+  <machine name="remote" address="10.42.43.10" user="abroun" default="false">
+    <env name="ROS_MASTER_URI" value="http://abroun-laptop:11311"/>
+  </machine>
+
   <!-- SSC32 Server -->
-  <node name="ssc32_server" output="screen" pkg="lynxmotion_arm" type="ROS_SSC32Server.py" respawn="false">
+  <node machine="remote" name="ssc32_server" pkg="lynxmotion_arm" type="ROS_SSC32Server.py" respawn="false">
     <rosparam ns="servoConfigData" file="$(find gaffa_bringup)/config/ServoConfig.yaml" command="load" />
+  </node>
+  
+  <!-- Maplin Arm Server -->
+  <node machine="remote" name="maplin_arm_server" pkg="maplin_arm" type="ROS_ArmServer.py" respawn="false">
   </node>
 
   <!-- Webcam -->
-  <node name="camera" output="screen" pkg="usb_cam" type="usb_cam_node" respawn="false">
+  <node machine="remote" name="camera" pkg="usb_cam" type="usb_cam_node" respawn="false">
     <param name="~pixel_format" value="yuyv" />
     <param name="~image_width" value="320" />
     <param name="~image_height" value="240" />

@@ -57,7 +57,7 @@ class ServoConfig( yaml.YAMLObject ):
 #-------------------------------------------------------------------------------
 class SSC32Driver:
     
-    DEFAULT_SERIAL_PORT = "/dev/ttyUSB0"
+    DEFAULT_SERIAL_PORT = "/dev/ttyS0"
     DEFAULT_BAUDRATE = 115200
     SERIAL_TIMEOUT = 0.5    # The max time to wait for a response
 
