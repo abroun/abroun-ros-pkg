@@ -1,0 +1,10 @@
+<launch>
+
+  <!-- Webcam -->
+  <node name="camera" output="screen" pkg="usb_cam" type="usb_cam_node" respawn="false">
+    <param name="~pixel_format" value="yuyv" />
+    <param name="~image_width" value="320" />
+    <param name="~image_height" value="240" />
+  </node>
+
+</launch>

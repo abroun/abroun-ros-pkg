@@ -1,0 +1,24 @@
+<package>
+  <description brief="object_detector">
+
+     Attempts to segment objects by looking for areas of the screen which move
+     in a similar way
+
+  </description>
+  <author>Alan Broun</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/object_detector</url>
+  
+  <depend package="rospy" />
+  <depend package="lynxmotion_arm" />
+  <depend package="sensor_msgs" />
+  <depend package="opencv2" />
+  <depend package="gripper_detector" />
+  
+  <rosdep name="python-numpy"/>
+  <rosdep name="python-scipy"/>
+
+</package>
+
+
