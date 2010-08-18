@@ -164,29 +164,8 @@ class MainWindow:
         # Now update the saliency map
         self.updateSaliencyMap()
         
-    #---------------------------------------------------------------------------
-    #@printTiming
-    def updateSaliencyMap( self ):
+    def numpySaliency( self, scaledImageGray ):
         
-        if self.curImage == None:
-            return
-            
-        # Convert the image to gray scale
-        imageGray = cv.CreateMat( self.curImage.height, self.curImage.width, cv.CV_8UC1 )
-        cv.CvtColor( self.curImage, imageGray, cv.CV_RGB2GRAY )
-        
-        # Scale the image, this determines the size of feature which is looked for
-        if self.curImage.height < self.curImage.width:
-            scale = float( self.saliencyMapWidth ) / float( self.curImage.height )
-        else:
-            scale = float( self.saliencyMapWidth ) / float( self.curImage.width )
-        
-        scaledWidth = self.saliencyMapWidth #int( self.curImage.width*scale )
-        scaledHeight = self.saliencyMapWidth #int( self.curImage.height*scale )
-        scaledImageGray = cv.CreateMat( scaledHeight, scaledWidth, cv.CV_8UC1 )
-        cv.Resize( imageGray, scaledImageGray )
-        
-        # Calculate the saliency map according to Hou and Zhang
         npImageGray = np.array( scaledImageGray )
         frequencyImage = np.fft.fft2( npImageGray )
         
@@ -215,6 +194,76 @@ class MainWindow:
         ifft = np.fft.ifft2( frequencyImage )
         
         saliencyMap = np.array( ifft.real, dtype=np.uint8 )
+        return saliencyMap
+        
+    def opencvSaliency( self, scaledImageGray ):
+        
+        cvImageGray = cv.CreateMat( scaledImageGray.height, scaledImageGray.width, cv.CV_32FC1 )
+        cv.Convert( scaledImageGray, cvImageGray )
+        
+        complexImageGray = cv.CreateMat( scaledImageGray.height, scaledImageGray.width, cv.CV_32FC2 )
+        cv.MixChannels( [cvImageGray], [complexImageGray], [(0, 0)] )
+        
+        cv.DFT( complexImageGray, complexImageGray, cv.CV_DXT_FORWARD, complexImageGray.height );
+        cvReal = cv.CreateMat( scaledImageGray.height, scaledImageGray.width, cv.CV_32FC1 )
+        cvImage = cv.CreateMat( scaledImageGray.height, scaledImageGray.width, cv.CV_32FC1 )
+        cv.Split( complexImageGray, cvReal, cvImage, None, None );
+        
+        return scaledImageGray
+        
+        
+        origReal = np.real( frequencyImage )
+        negReal = np.less( origReal, 0 )
+        origReal[ negReal == True ] = np.negative( origReal[ negReal == True ] )
+        
+        logSpectrum = np.log( origReal )
+        
+        AVERAGE_KERNEL_SIZE = 3
+        averageKernel = np.divide( 
+            np.ones( shape=(AVERAGE_KERNEL_SIZE,AVERAGE_KERNEL_SIZE) ),
+            float( AVERAGE_KERNEL_SIZE*AVERAGE_KERNEL_SIZE ) )
+        averageSpectrum = scipy.signal.convolve2d( logSpectrum, averageKernel, mode='same' )        
+        
+        residualSpectrum = logSpectrum #np.subtract( logSpectrum, averageSpectrum ) 
+        #print residualSpectrum   
+        
+        #print frequencyImage.imag
+        #frequencyImage = np.square( np.exp( np.add( residualSpectrum, np.imag( frequencyImage ) ) ) )
+        
+        newReal = np.exp( residualSpectrum )
+        newReal[ negReal == True ] = 0.0#np.negative( newReal[ negReal == True ] )
+        
+        frequencyImage.real = newReal
+        ifft = np.fft.ifft2( frequencyImage )
+        
+        saliencyMap = np.array( ifft.real, dtype=np.uint8 )
+        return saliencyMap
+        
+    #---------------------------------------------------------------------------
+    #@printTiming
+    def updateSaliencyMap( self ):
+        
+        if self.curImage == None:
+            return
+            
+        # Convert the image to gray scale
+        imageGray = cv.CreateMat( self.curImage.height, self.curImage.width, cv.CV_8UC1 )
+        cv.CvtColor( self.curImage, imageGray, cv.CV_RGB2GRAY )
+        
+        # Scale the image, this determines the size of feature which is looked for
+        if self.curImage.height < self.curImage.width:
+            scale = float( self.saliencyMapWidth ) / float( self.curImage.height )
+        else:
+            scale = float( self.saliencyMapWidth ) / float( self.curImage.width )
+        
+        scaledWidth = self.saliencyMapWidth #int( self.curImage.width*scale )
+        scaledHeight = self.saliencyMapWidth #int( self.curImage.height*scale )
+        scaledImageGray = cv.CreateMat( scaledHeight, scaledWidth, cv.CV_8UC1 )
+        cv.Resize( imageGray, scaledImageGray )
+        
+        # Calculate the saliency map according to Hou and Zhang
+        #saliencyMap = self.numpySaliency( scaledImageGray )
+        saliencyMap = self.opencvSaliency( scaledImageGray )
         
         self.curSaliencyMap = saliencyMap
         
