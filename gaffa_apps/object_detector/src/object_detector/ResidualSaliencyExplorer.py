@@ -12,6 +12,7 @@ import time
 
 import numpy as np
 import scipy.signal
+import scipy.ndimage.filters as filters
 import cv
 
 import yaml
@@ -177,9 +178,13 @@ class MainWindow:
         imageSpectrum.imag = np.sin( phaseAngle )
         
         # Reconstruct the image using just the phase angle
-        newImage = np.fft.ifft2( imageSpectrum )
+        newImage = np.fft.ifft2( imageSpectrum ).real
         
-        # Normalise the image
+        # Square the image as we are interpreting it as an error...
+        newImage = np.square( newImage )
+        
+        # Smmoth and normalise the image
+        newImage = filters.gaussian_filter( newImage, 4.0, mode='constant' )
         minVal = np.amin( newImage )
         maxVal = np.amax( newImage )
         newImage = np.multiply( np.subtract( newImage, minVal ), 255.0/maxVal )
@@ -258,6 +263,25 @@ class MainWindow:
         return saliencyMap
         
     #---------------------------------------------------------------------------
+    def tunedSaliency( self, imageGray ):
+        
+        smoothingFilter = np.array( 
+            [[ 0.0, 0.0, 1.0, 0.0, 0.0 ],
+            [ 0.0, 1.0, 4.0, 1.0, 0.0 ],
+            [ 1.0, 4.0, 6.0, 4.0, 1.0 ],
+            [ 0.0, 1.0, 4.0, 1.0, 0.0 ],
+            [ 0.0, 0.0, 1.0, 0.0, 0.0 ]] )
+        smoothingFilter = np.divide( smoothingFilter, 16.0 )
+        
+        smoothedImage = filters.convolve( imageGray, smoothingFilter, mode='constant' )
+        averageValue = np.mean( imageGray )
+        
+        saliencyMap = np.abs( np.subtract( averageValue, smoothedImage ) )
+        saliencyMap = np.array( saliencyMap, dtype=np.uint8 )
+        
+        return saliencyMap
+        
+    #---------------------------------------------------------------------------
     @printTiming
     def updateSaliencyMap( self ):
         
@@ -274,14 +298,15 @@ class MainWindow:
         else:
             scale = float( self.saliencyMapWidth ) / float( self.curImage.width )
         
-        scaledWidth = int( self.curImage.width*scale )
-        scaledHeight = int( self.curImage.height*scale )
+        scaledWidth = self.saliencyMapWidth #int( self.curImage.width*scale )
+        scaledHeight = self.saliencyMapWidth #int( self.curImage.height*scale )
         scaledImageGray = cv.CreateMat( scaledHeight, scaledWidth, cv.CV_8UC1 )
         cv.Resize( imageGray, scaledImageGray )
         
         # Calculate the saliency map according to Hou and Zhang
         saliencyMap = self.numpySaliency( scaledImageGray )
         #saliencyMap = self.opencvSaliency( scaledImageGray )
+        #saliencyMap = self.tunedSaliency( imageGray )
         
         self.curSaliencyMap = saliencyMap
         
