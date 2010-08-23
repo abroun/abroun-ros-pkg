@@ -163,84 +163,102 @@ class MainWindow:
 
         # Now update the saliency map
         self.updateSaliencyMap()
-        
+    
+    #---------------------------------------------------------------------------
     def numpySaliency( self, scaledImageGray ):
         
+        # Convert the image to the complex frequency domain
         npImageGray = np.array( scaledImageGray )
-        frequencyImage = np.fft.fft2( npImageGray )
+        imageSpectrum = np.fft.fft2( npImageGray )
         
-        origReal = np.real( frequencyImage )
-        negReal = np.less( origReal, 0 )
-        origReal[ negReal == True ] = np.negative( origReal[ negReal == True ] )
+        phaseAngle = np.angle( imageSpectrum )
         
-        logSpectrum = np.log( origReal )
+        imageSpectrum.real = np.cos( phaseAngle )
+        imageSpectrum.imag = np.sin( phaseAngle )
         
-        AVERAGE_KERNEL_SIZE = 3
-        averageKernel = np.divide( 
-            np.ones( shape=(AVERAGE_KERNEL_SIZE,AVERAGE_KERNEL_SIZE) ),
-            float( AVERAGE_KERNEL_SIZE*AVERAGE_KERNEL_SIZE ) )
-        averageSpectrum = scipy.signal.convolve2d( logSpectrum, averageKernel, mode='same' )        
+        # Reconstruct the image using just the phase angle
+        newImage = np.fft.ifft2( imageSpectrum )
         
-        residualSpectrum = logSpectrum #np.subtract( logSpectrum, averageSpectrum ) 
-        #print residualSpectrum   
+        # Normalise the image
+        minVal = np.amin( newImage )
+        maxVal = np.amax( newImage )
+        newImage = np.multiply( np.subtract( newImage, minVal ), 255.0/maxVal )
         
-        #print frequencyImage.imag
-        #frequencyImage = np.square( np.exp( np.add( residualSpectrum, np.imag( frequencyImage ) ) ) )
+        saliencyMap = np.array( newImage, dtype=np.uint8 )
         
-        newReal = np.exp( residualSpectrum )
-        newReal[ negReal == True ] = 0.0#np.negative( newReal[ negReal == True ] )
-        
-        frequencyImage.real = newReal
-        ifft = np.fft.ifft2( frequencyImage )
-        
-        saliencyMap = np.array( ifft.real, dtype=np.uint8 )
         return saliencyMap
-        
+    
+    #---------------------------------------------------------------------------
     def opencvSaliency( self, scaledImageGray ):
         
         cvImageGray = cv.CreateMat( scaledImageGray.height, scaledImageGray.width, cv.CV_32FC1 )
         cv.Convert( scaledImageGray, cvImageGray )
         
-        complexImageGray = cv.CreateMat( scaledImageGray.height, scaledImageGray.width, cv.CV_32FC2 )
-        cv.MixChannels( [cvImageGray], [complexImageGray], [(0, 0)] )
+        src = cvImageGray
+        dftWidth = cv.GetOptimalDFTSize( src.width - 1 )
+        dftHeight = cv.GetOptimalDFTSize( src.height - 1 )
+
+        real = cv.CreateMat( dftHeight, dftWidth, cv.CV_32FC1 )
+        imaginary = cv.CreateMat( dftHeight, dftWidth, cv.CV_32FC1 )
+        dft = cv.CreateMat( dftHeight, dftWidth, cv.CV_32FC2 )
+    
+        tmp = cv.GetSubRect( real, ( 0, 0, src.width, src.height ) )
+        cv.Copy( src, tmp )
+        cv.Zero( imaginary )
+    
+        cv.Merge( real, imaginary, None, None, dft )
+        # do the fft
+        cv.DFT( dft, dft, cv.CV_DXT_FORWARD, src.height )
+        cv.Split( dft, real, imaginary, None, None )
+    
+        cv.CartToPolar( real, imaginary, real, imaginary, 0 )
+        cv.Log( real, real )
+        filtered = cv.CreateMat( dftHeight, dftWidth, cv.CV_32FC1 )
+        cv.Copy( real, filtered )
+        cv.Smooth( filtered, filtered, cv.CV_BLUR )
+    
+        cv.Sub( real, filtered, real, None )
+        cv.Exp( real, real )
+        cv.PolarToCart( real, imaginary, real, imaginary,0 )
+        #cv.PolarToCart( np.ones( shape=(dftHeight,dftWidth), dtype=np.float32 ), imaginary, real, imaginary,0 )
+    
+        # do inverse fourier transform
+        cv.Merge( real, imaginary, None, None, dft )
+        cv.DFT( dft, dft, cv.CV_DXT_INV_SCALE, src.height )
+        cv.Split( dft, real, imaginary, None, None )
+
+        # get magnitude
+        cv.CartToPolar( real, imaginary, real, None, 0 );
+        cv.Pow( real, real, 2.0 )
+    
+        FILTER_RAD = 3
+        IPL_BORDER_CONSTANT = 0
+
+        sfiltered = cv.CreateMat( real.height+FILTER_RAD*2, real.width+FILTER_RAD*2, cv.CV_32FC1 )
+        cv.CopyMakeBorder( real, sfiltered, ( FILTER_RAD, FILTER_RAD ), IPL_BORDER_CONSTANT )
+
+        cv.Smooth( sfiltered, sfiltered, cv.CV_GAUSSIAN, 2*FILTER_RAD + 1 )
+    
+        ( min, max, minLoc, maxLoc ) =  cv.MinMaxLoc( sfiltered )
+        cv.ConvertScale( sfiltered, sfiltered, 1/(max-min), -min/(max-min) )
+    
+        # copy result to output image
+        tmp = cv.GetSubRect( sfiltered, ( FILTER_RAD, FILTER_RAD, src.width, src.height ) )
+        cv.Copy( tmp, cvImageGray )
+ 
+    #cvReleaseMat(&sfiltered);
+    #cvReleaseMat(&real);
+    #cvReleaseMat(&filtered);
+    #cvReleaseMat(&imaginary);
+    #cvReleaseMat(&dft);
         
-        cv.DFT( complexImageGray, complexImageGray, cv.CV_DXT_FORWARD, complexImageGray.height );
-        cvReal = cv.CreateMat( scaledImageGray.height, scaledImageGray.width, cv.CV_32FC1 )
-        cvImage = cv.CreateMat( scaledImageGray.height, scaledImageGray.width, cv.CV_32FC1 )
-        cv.Split( complexImageGray, cvReal, cvImage, None, None );
-        
-        return scaledImageGray
         
         
-        origReal = np.real( frequencyImage )
-        negReal = np.less( origReal, 0 )
-        origReal[ negReal == True ] = np.negative( origReal[ negReal == True ] )
-        
-        logSpectrum = np.log( origReal )
-        
-        AVERAGE_KERNEL_SIZE = 3
-        averageKernel = np.divide( 
-            np.ones( shape=(AVERAGE_KERNEL_SIZE,AVERAGE_KERNEL_SIZE) ),
-            float( AVERAGE_KERNEL_SIZE*AVERAGE_KERNEL_SIZE ) )
-        averageSpectrum = scipy.signal.convolve2d( logSpectrum, averageKernel, mode='same' )        
-        
-        residualSpectrum = logSpectrum #np.subtract( logSpectrum, averageSpectrum ) 
-        #print residualSpectrum   
-        
-        #print frequencyImage.imag
-        #frequencyImage = np.square( np.exp( np.add( residualSpectrum, np.imag( frequencyImage ) ) ) )
-        
-        newReal = np.exp( residualSpectrum )
-        newReal[ negReal == True ] = 0.0#np.negative( newReal[ negReal == True ] )
-        
-        frequencyImage.real = newReal
-        ifft = np.fft.ifft2( frequencyImage )
-        
-        saliencyMap = np.array( ifft.real, dtype=np.uint8 )
+        saliencyMap = np.array( 255.0*np.array( cvImageGray ), dtype=np.uint8 )
         return saliencyMap
         
     #---------------------------------------------------------------------------
-    #@printTiming
+    @printTiming
     def updateSaliencyMap( self ):
         
         if self.curImage == None:
@@ -256,14 +274,14 @@ class MainWindow:
         else:
             scale = float( self.saliencyMapWidth ) / float( self.curImage.width )
         
-        scaledWidth = self.saliencyMapWidth #int( self.curImage.width*scale )
-        scaledHeight = self.saliencyMapWidth #int( self.curImage.height*scale )
+        scaledWidth = int( self.curImage.width*scale )
+        scaledHeight = int( self.curImage.height*scale )
         scaledImageGray = cv.CreateMat( scaledHeight, scaledWidth, cv.CV_8UC1 )
         cv.Resize( imageGray, scaledImageGray )
         
         # Calculate the saliency map according to Hou and Zhang
-        #saliencyMap = self.numpySaliency( scaledImageGray )
-        saliencyMap = self.opencvSaliency( scaledImageGray )
+        saliencyMap = self.numpySaliency( scaledImageGray )
+        #saliencyMap = self.opencvSaliency( scaledImageGray )
         
         self.curSaliencyMap = saliencyMap
         
@@ -309,6 +327,7 @@ class MainWindow:
         
         if filename != None:
             cvImage = cv.LoadImage( filename )
+            cv.CvtColor( cvImage, cvImage, cv.CV_BGR2RGB )
             
             self.checkGetImageFromCamera.set_active( False )
             self.processImage( cvImage )

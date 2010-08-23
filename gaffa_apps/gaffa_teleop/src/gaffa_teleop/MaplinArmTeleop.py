@@ -44,8 +44,7 @@ class MainWindow:
         self.leftButtonPressed = False
         self.rightButtonPressed = False
         
-        self.guideImagePixBuf = gtk.gdk.pixbuf_new_from_file( 
-            self.scriptPath + "/../../config/OpticalFlowPos.png" )
+        self.guideImagePixBuf = None
             
         # Setup the GUI        
         builder = gtk.Builder()
@@ -92,9 +91,10 @@ class MainWindow:
                 self.dwgCameraImage.set_size_request( rosImage.width, rosImage.height )
 
             # Add the guide
-            self.guideImagePixBuf.composite( self.cameraImagePixBuf, 0, 0, 
-                self.guideImagePixBuf.get_width(), self.guideImagePixBuf.get_height(), 
-                0, 0, 1.0, 1.0, gtk.gdk.INTERP_NEAREST, 255 )
+            if self.guideImagePixBuf != None:
+                self.guideImagePixBuf.composite( self.cameraImagePixBuf, 0, 0, 
+                    self.guideImagePixBuf.get_width(), self.guideImagePixBuf.get_height(), 
+                    0, 0, 1.0, 1.0, gtk.gdk.INTERP_NEAREST, 255 )
 
             self.dwgCameraImage.queue_draw()
             self.lastImage = rosImage
@@ -172,6 +172,48 @@ class MainWindow:
             imgRect.height = imageHeight
         
         return imgRect
+        
+    #---------------------------------------------------------------------------
+    def chooseImageFile( self ):
+        
+        result = None
+        
+        dialog = gtk.FileChooserDialog(
+            title="Choose Image File",
+            action=gtk.FILE_CHOOSER_ACTION_SAVE,
+            buttons=(gtk.STOCK_CANCEL, gtk.RESPONSE_REJECT,
+                      gtk.STOCK_OK, gtk.RESPONSE_ACCEPT) )
+
+        dialog.set_current_folder( self.scriptPath + "/../../config" )
+            
+        filter = gtk.FileFilter()
+        filter.add_pattern( "*.png" )
+        filter.add_pattern( "*.bmp" )
+        filter.add_pattern( "*.jpg" )
+        filter.set_name( "Image Files" )
+        dialog.add_filter( filter )
+        dialog.set_filter( filter )
+            
+        result = dialog.run()
+
+        if result == gtk.RESPONSE_ACCEPT:
+            result = dialog.get_filename()
+
+        dialog.destroy()
+        
+        return result
+        
+    #---------------------------------------------------------------------------
+    def onMenuItemLoadGuideActivate( self, widget ):
+        
+        filename = self.chooseImageFile()
+        
+        if filename != None:
+            self.guideImagePixBuf = gtk.gdk.pixbuf_new_from_file( filename )
+    
+    #---------------------------------------------------------------------------
+    def onMenuItemQuitActivate( self, widget ):
+        self.onWinMainDestroy( widget )
         
     #---------------------------------------------------------------------------
     def update( self ):

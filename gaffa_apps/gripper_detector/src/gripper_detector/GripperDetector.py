@@ -123,21 +123,21 @@ class MainWindow:
     
     TEST_ARM_POSITIONS = [
         ArmPos( {
-            "base_rotate" : math.radians( 0.69 ), 
+            "base_rotate" : math.radians( 72.65 ), 
             "shoulder_rotate" : math.radians( 75.99 ), 
             "elbow_rotate" : math.radians( -97.34 ), 
             "wrist_rotate" : math.radians( 80.05 ),
             "gripper_rotate" : math.radians( -0.03 ) },
             ( 100, 85 ) ),
         ArmPos( {
-            "base_rotate" : math.radians( 23.96 ), 
+            "base_rotate" : math.radians( 85.0 ), 
             "shoulder_rotate" : math.radians( 72.59 ), 
             "elbow_rotate" : math.radians( -107.21 ), 
             "wrist_rotate" : math.radians( 87.14 ),
             "gripper_rotate" : math.radians( -67.23 ) },
             ( 97, 170 ) ),
         ArmPos( {
-            "base_rotate" : math.radians( -41.24 ), 
+            "base_rotate" : math.radians( 0.0 ), 
             "shoulder_rotate" : math.radians( 57.32 ), 
             "elbow_rotate" : math.radians( -116.48 ), 
             "wrist_rotate" : math.radians( 130.12 ),

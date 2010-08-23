@@ -15,6 +15,7 @@
 
   <!-- Webcam -->
   <node machine="remote" name="camera" pkg="usb_cam" type="usb_cam_node" respawn="false">
+    <param name="~video_device" value="/dev/video0" />
     <param name="~pixel_format" value="yuyv" />
     <param name="~image_width" value="320" />
     <param name="~image_height" value="240" />
