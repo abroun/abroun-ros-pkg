@@ -15,6 +15,7 @@
   <depend package="sensor_msgs" />
   <depend package="opencv2" />
   <depend package="gripper_detector" />
+  <depend package="abroun_gtk_gui" />
   
   <rosdep name="python-numpy"/>
   <rosdep name="python-scipy"/>

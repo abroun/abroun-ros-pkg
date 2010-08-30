@@ -146,6 +146,9 @@ class MainWindow:
     OPTICAL_FLOW_BLOCK_HEIGHT = 8
     OPTICAL_FLOW_RANGE_WIDTH = 8    # Range to look outside of a block for motion
     OPTICAL_FLOW_RANGE_HEIGHT = 8
+    OPTICAL_FLOW_METHOD = "BlockMatching"
+    #OPTICAL_FLOW_METHOD = "LucasKanade"
+    #OPTICAL_FLOW_METHOD = "HornSchunck"
     
     MAX_TEST_POINT_X = (320 - OPTICAL_FLOW_BLOCK_WIDTH)/OPTICAL_FLOW_BLOCK_WIDTH - 1
     MAX_TEST_POINT_Y = (240 - OPTICAL_FLOW_BLOCK_HEIGHT)/OPTICAL_FLOW_BLOCK_HEIGHT - 1
@@ -204,6 +207,8 @@ class MainWindow:
         lastAngleTime = None
         lastCameraTime = None
         
+        t1 = time.time()
+        
         # Extract messages from the bag
         startTime = None
         for topic, msg, t in rosrecord.logplayer( bagFilename ):
@@ -235,6 +240,8 @@ class MainWindow:
                 
                 imgIdx += 1
 
+        t2 = time.time()
+        print 'Processing sequence took %0.3f ms' % ((t2-t1)*1000.0)
         
         #self.opticalFlowArraysX = np.negative( self.opticalFlowArraysX )
         #self.opticalFlowArraysY = np.negative( self.opticalFlowArraysY )
@@ -496,7 +503,8 @@ class MainWindow:
             cv.CvtColor( curImageRGB, curImageGray, cv.CV_RGB2GRAY )
             
             # Look for optical flow between this image and the last one
-            opticalFlowArrayX, opticalFlowArrayY = self.opticalFlowFilter.calcOpticalFlow( curImageGray )
+            opticalFlowArrayX, opticalFlowArrayY = \
+                self.opticalFlowFilter.calcOpticalFlow( curImageGray, self.OPTICAL_FLOW_METHOD )
             
         else:
             rospy.logerr( "Unhandled image encoding - " + rosImage.encoding )

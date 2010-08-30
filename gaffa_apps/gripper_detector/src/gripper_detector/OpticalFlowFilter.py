@@ -1,5 +1,6 @@
 
 import cv
+import numpy as np
 
 #-------------------------------------------------------------------------------
 class OpticalFlowFilter:
@@ -29,7 +30,7 @@ class OpticalFlowFilter:
         return int((imageHeight - self.opticalFlowBlockHeight)/self.opticalFlowBlockHeight)
         
     #---------------------------------------------------------------------------
-    def calcOpticalFlow( self, curImageGray ):
+    def calcOpticalFlow( self, curImageGray, method="BlockMatching" ):
         
         if curImageGray.channels != 1 or curImageGray.depth != 8:
             raise Exception( "Only able to process gray-scale images" )
@@ -43,14 +44,46 @@ class OpticalFlowFilter:
         storageWidth = self.calcOpticalFlowWidth( lastImageGray.width )
         storageHeight = self.calcOpticalFlowHeight( lastImageGray.height )
         
-        opticalFlowArrayX = cv.CreateMat( storageHeight, storageWidth, cv.CV_32FC1 )
-        opticalFlowArrayY = cv.CreateMat( storageHeight, storageWidth, cv.CV_32FC1 )
+        if method == "BlockMatching":
+            opticalFlowArrayX = np.ndarray( shape=( storageHeight, storageWidth ), dtype=np.float32 )
+            opticalFlowArrayY = np.ndarray( shape=( storageHeight, storageWidth ), dtype=np.float32 )
+                
+            cv.CalcOpticalFlowBM( lastImageGray, curImageGray, 
+                ( self.opticalFlowBlockWidth, self.opticalFlowBlockHeight ),
+                ( self.opticalFlowBlockWidth, self.opticalFlowBlockHeight ),
+                ( self.opticalFlowRangeWidth, self.opticalFlowRangeHeight ),
+                0, opticalFlowArrayX, opticalFlowArrayY )
+        elif method == "LucasKanade":
             
-        cv.CalcOpticalFlowBM( lastImageGray, curImageGray, 
-            ( self.opticalFlowBlockWidth, self.opticalFlowBlockHeight ),
-            ( self.opticalFlowBlockWidth, self.opticalFlowBlockHeight ),
-            ( self.opticalFlowRangeWidth, self.opticalFlowRangeHeight ),
-            0, opticalFlowArrayX, opticalFlowArrayY )
+            largeOpticalFlowArrayX = np.ndarray( shape=( lastImageGray.height, lastImageGray.width ), dtype=np.float32 )
+            largeOpticalFlowArrayY = np.ndarray( shape=( lastImageGray.height, lastImageGray.width ), dtype=np.float32 )
+            
+            cv.CalcOpticalFlowLK( lastImageGray, curImageGray,
+                ( 15, 15 ), #( self.opticalFlowBlockWidth, self.opticalFlowBlockHeight ),
+                largeOpticalFlowArrayX, largeOpticalFlowArrayY )
+                
+            indexGrid = np.mgrid[ 0:storageHeight, 0:storageWidth ]
+            indexGrid[ 0 ] = indexGrid[ 0 ]*self.opticalFlowBlockHeight + self.opticalFlowBlockHeight/2
+            indexGrid[ 1 ] = indexGrid[ 1 ]*self.opticalFlowRangeWidth + self.opticalFlowRangeWidth/2
+            opticalFlowArrayX = largeOpticalFlowArrayX[ indexGrid[ 0 ], indexGrid[ 1 ] ]
+            opticalFlowArrayY = largeOpticalFlowArrayY[ indexGrid[ 0 ], indexGrid[ 1 ] ]
+        elif method == "HornSchunck":
+            
+            largeOpticalFlowArrayX = np.ndarray( shape=( lastImageGray.height, lastImageGray.width ), dtype=np.float32 )
+            largeOpticalFlowArrayY = np.ndarray( shape=( lastImageGray.height, lastImageGray.width ), dtype=np.float32 )
+            
+            cv.CalcOpticalFlowHS( lastImageGray, curImageGray,
+                0, largeOpticalFlowArrayX, largeOpticalFlowArrayY,
+                1.0, (cv.CV_TERMCRIT_ITER | cv.CV_TERMCRIT_EPS, 10, 0.01) )
+                
+            indexGrid = np.mgrid[ 0:storageHeight, 0:storageWidth ]
+            indexGrid[ 0 ] = indexGrid[ 0 ]*self.opticalFlowBlockHeight + self.opticalFlowBlockHeight/2
+            indexGrid[ 1 ] = indexGrid[ 1 ]*self.opticalFlowRangeWidth + self.opticalFlowRangeWidth/2
+            opticalFlowArrayX = largeOpticalFlowArrayX[ indexGrid[ 0 ], indexGrid[ 1 ] ]
+            opticalFlowArrayY = largeOpticalFlowArrayY[ indexGrid[ 0 ], indexGrid[ 1 ] ]
+            
+        else:
+            raise Exception( "Unhandled method" )
             
         # Save the current image
         self.lastImageGray = curImageGray
