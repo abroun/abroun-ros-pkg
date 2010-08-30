@@ -1,0 +1,14 @@
+<package>
+  <description brief="gaffa_arm_navigation_actions">
+
+     gaffa_arm_navigation_actions
+
+  </description>
+  <author>Alan Broun</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/gaffa_arm_navigation_actions</url>
+
+</package>
+
+

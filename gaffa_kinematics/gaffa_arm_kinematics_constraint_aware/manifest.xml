@@ -1,0 +1,24 @@
+<package>
+  <description brief="gaffa_arm_kinematics_constraint_aware">
+
+     gaffa_arm_kinematics_constraint_aware
+
+  </description>
+  <author>Alan Broun</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/gaffa_arm_kinematics_constraint_aware</url>
+  
+  <depend package="gaffa_arm_kinematics"/>
+  <depend package="collision_space"/>
+  <depend package="planning_models"/>
+  <depend package="planning_environment"/>
+  <depend package="mapping_msgs"/>
+  
+  <export>
+   <cpp cflags="-I${prefix}/include" lflags="-Wl,-rpath,${prefix}/lib -L${prefix}/lib -lgaffa_arm_kinematics_constraint_aware_lib"/>
+  </export>
+
+</package>
+
+

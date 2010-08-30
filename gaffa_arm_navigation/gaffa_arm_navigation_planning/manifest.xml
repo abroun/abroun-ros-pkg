@@ -1,0 +1,17 @@
+<package>
+  <description brief="gaffa_arm_navigation_planning">
+
+     gaffa_arm_navigation_planning
+
+  </description>
+  <author>Alan Broun</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/gaffa_arm_navigation_planning</url>
+  
+  <depend package="ompl_planning" />
+  <depend package="ompl_search" />
+
+</package>
+
+

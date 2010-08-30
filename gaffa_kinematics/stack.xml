@@ -1,0 +1,9 @@
+<stack>
+  <description brief="gaffa_kinematics">gaffa_kinematics</description>
+  <author>Maintained by Alan Broun</author>
+  <license>BSD</license>  
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/gaffa_kinematics</url>
+  <depend stack="ros" />
+
+</stack>

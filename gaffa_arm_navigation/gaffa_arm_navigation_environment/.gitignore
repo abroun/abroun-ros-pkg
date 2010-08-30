@@ -1,0 +1,10 @@
+# Directories
+bin
+build
+msg_gen
+lib
+
+# Files
+*.pyc
+
+

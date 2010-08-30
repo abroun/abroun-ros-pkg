@@ -1,0 +1,7 @@
+<launch>
+  <!-- send parameters for collision checking for Gaffa; this includes parameters for the self filter -->
+  <rosparam command="load" ns="robot_description_collision" file="$(find gaffa_arm_navigation_environment)/config/collision_checks.yaml" />
+
+  <!-- send parameters needed for motion planning -->
+  <rosparam command="load" ns="robot_description_planning" file="$(find gaffa_arm_navigation_environment)/config/planning_groups.yaml" />
+</launch>

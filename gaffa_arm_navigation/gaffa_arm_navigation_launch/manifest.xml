@@ -1,0 +1,19 @@
+<package>
+  <description brief="gaffa_arm_navigation_launch">
+
+     gaffa_arm_navigation_launch
+
+  </description>
+  <author>Alan Broun</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/gaffa_arm_navigation_launch</url>
+
+  <depend package="gaffa_arm_navigation_actions" />
+  <depend package="gaffa_arm_navigation_environment" />
+  <depend package="gaffa_arm_navigation_kinematics" />
+  <depend package="gaffa_arm_navigation_planning" />
+
+</package>
+
+

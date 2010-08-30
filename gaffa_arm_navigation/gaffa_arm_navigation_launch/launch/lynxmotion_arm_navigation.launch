@@ -1,0 +1,19 @@
+<launch>
+  <!-- load perception -->
+  <!--<include file="$(find gaffa_arm_navigation_perception)/launch/laser-perception.launch"/>-->
+  <!-- load planning -->
+  <include file="$(find gaffa_arm_navigation_planning)/launch/ompl_planning.launch"/>
+
+  <!-- load move_arm -->
+  <include file="$(find gaffa_arm_navigation_actions)/launch/move_lynxmotion_arm.launch"/>
+
+  <!-- load planning_environment -->
+  <include file="$(find gaffa_arm_navigation_environment)/launch/environment_server.launch"/>
+
+  <!-- load controllers -->
+  <!--<include file="$(find gaffa_arm_navigation_filtering)/launch/trajectory_filter.launch"/>-->
+
+  <!-- load ik -->
+  <include file="$(find gaffa_arm_navigation_kinematics)/launch/collision_free_ik.launch"/>
+
+</launch>

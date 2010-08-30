@@ -1,0 +1,24 @@
+## This file should be loaded under <robot description>_planning
+
+## the definition of each group
+groups:
+
+  - name: lynxmotion_arm
+    joints:
+      lynxmotion_base_block_joint
+      lynxmotion_base_rotate_joint
+      lynxmotion_shoulder_rotate_joint
+      lynxmotion_elbow_rotate_joint
+      lynxmotion_wrist_rotate_joint
+    links:
+      lynxmotion_base_block
+      lynxmotion_base_rotate_link
+      lynxmotion_upper_arm_link
+      lynxmotion_fore_arm_link
+      lynxmotion_wrist_link
+
+  - name: lynxmotion_end_effector
+    links: 
+      lynxmotion_gripper_base_link
+      lynxmotion_gripper_left_finger_link
+      lynxmotion_gripper_right_finger_link

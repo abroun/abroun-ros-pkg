@@ -1,0 +1,33 @@
+<package>
+  <description brief="gaffa_arm_kinematics">
+
+     gaffa_arm_kinematics
+
+  </description>
+  <author>Alan Broun</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/gaffa_arm_kinematics</url>
+
+  <depend package="roscpp"/>
+  <depend package="kdl"/>
+  <depend package="eigen"/>
+  <depend package="angles"/>
+  <depend package="tf_conversions"/>
+  <depend package="urdf"/>
+  <depend package="geometry_msgs"/>
+  <depend package="kdl_parser"/>
+
+  <depend package="kinematics_msgs" />
+
+  <depend package="pluginlib"/>
+  <depend package="kinematics_base"/>
+
+  <export>
+   <cpp cflags="-I${prefix}/include" lflags="-Wl,-rpath,${prefix}/lib -L${prefix}/lib -lgaffa_arm_kinematics_lib"/>
+  <kinematics_base plugin="${prefix}/kinematics_plugins.xml" />
+  </export>
+
+</package>
+
+
