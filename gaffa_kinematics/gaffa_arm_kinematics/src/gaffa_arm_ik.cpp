@@ -54,8 +54,9 @@ bool GaffaArmIK::init(const urdf::Model &robot_model, const std::string &root_na
   std::vector<urdf::Pose> link_offset;
   int num_joints = 0;
   boost::shared_ptr<const urdf::Link> link = robot_model.getLink(tip_name);
-  while(link && num_joints < 7)
-  {
+  
+  while(link && num_joints < NUM_JOINTS_ARM_DOF)
+  {    
     boost::shared_ptr<const urdf::Joint> joint = robot_model.getJoint(link->parent_joint->name);
     if(!joint)
     {
@@ -66,7 +67,7 @@ bool GaffaArmIK::init(const urdf::Model &robot_model, const std::string &root_na
     {
       link_offset.push_back(link->parent_joint->parent_to_joint_origin_transform);
       angle_multipliers_.push_back(joint->axis.x*fabs(joint->axis.x) +  joint->axis.y*fabs(joint->axis.y) +  joint->axis.z*fabs(joint->axis.z));
-      ROS_DEBUG("Joint axis: %d, %f, %f, %f",6-num_joints,joint->axis.x,joint->axis.y,joint->axis.z);
+      ROS_DEBUG("Joint axis: %d, %f, %f, %f",(NUM_JOINTS_ARM_DOF-1)-num_joints,joint->axis.x,joint->axis.y,joint->axis.z);
       if(joint->type != urdf::Joint::CONTINUOUS)
       {
         min_angles_.push_back(joint->safety->soft_lower_limit);
@@ -98,9 +99,10 @@ bool GaffaArmIK::init(const urdf::Model &robot_model, const std::string &root_na
   std::reverse(solver_info_.link_names.begin(),solver_info_.link_names.end());
   std::reverse(continuous_joint_.begin(),continuous_joint_.end());
 
-  if(num_joints != 7)
+  if(num_joints != NUM_JOINTS_ARM_DOF)
   {
-    ROS_FATAL("GaffaArmIK:: Chain from %s to %s does not have 7 joints",root_name.c_str(),tip_name.c_str());
+    ROS_FATAL("GaffaArmIK:: Chain from %s to %s does not have %i joints",
+              root_name.c_str(),tip_name.c_str(),NUM_JOINTS_ARM_DOF);
     return false;
   }
 
@@ -118,7 +120,7 @@ bool GaffaArmIK::init(const urdf::Model &robot_model, const std::string &root_na
   home_inv_ = home.inverse();
   grhs_ = home;
   gf_ = home_inv_;
-  solution_.resize( NUM_JOINTS_ARM7DOF);
+  solution_.resize( NUM_JOINTS_ARM_DOF);
   return true;
 }
 
@@ -621,7 +623,7 @@ void GaffaArmIK::computeIKShoulderRoll(const Eigen::Matrix4f &g_in, const double
 
 bool GaffaArmIK::checkJointLimits(const std::vector<double> &joint_values)
 {
-  for(int i=0; i<NUM_JOINTS_ARM7DOF; i++)
+  for(int i=0; i<NUM_JOINTS_ARM_DOF; i++)
   {
     if(!checkJointLimits(angles::normalize_angle(joint_values[i]*angle_multipliers_[i]),i))
     {

@@ -4,8 +4,8 @@
 
  <node pkg="gaffa_arm_kinematics_constraint_aware" type="gaffa_arm_kinematics_constraint_aware" name="gaffa_lynxmotion_arm_kinematics" output="screen">    
    <!-- IK parameters -->
-   <param name="tip_name" value="lynxmotion_base_block_joint" />     
-   <param name="root_name" value="lynxmotion_wrist_link" />  
+   <param name="tip_name" value="lynxmotion_wrist_link" />     
+   <param name="root_name" value="lynxmotion_base_block" />  
 
    <!-- Collision environment parameters -->
    <remap from="robot_description" to="/robot_description" />

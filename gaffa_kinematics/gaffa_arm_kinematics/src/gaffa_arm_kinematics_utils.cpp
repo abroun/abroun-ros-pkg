@@ -79,7 +79,7 @@ namespace gaffa_arm_kinematics
     {
       ROS_ERROR("Could not initialize tree object");
       return false;
-    }
+    } 
     if (!tree.getChain(root_name, tip_name, kdl_chain))
     {
       ROS_ERROR("Could not initialize chain object");

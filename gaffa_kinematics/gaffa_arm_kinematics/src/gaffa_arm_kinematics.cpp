@@ -52,7 +52,7 @@ namespace gaffa_arm_kinematics {
   static const std::string IK_INFO_SERVICE = "get_ik_solver_info";
   static const std::string FK_INFO_SERVICE = "get_fk_solver_info";
 
-  GaffaArmKinematics::GaffaArmKinematics():  node_handle_("~"),dimension_(7)
+  GaffaArmKinematics::GaffaArmKinematics():  node_handle_("~"),dimension_(5)
   {
     urdf::Model robot_model;
     std::string tip_name, xml_string;
@@ -69,12 +69,13 @@ namespace gaffa_arm_kinematics {
       active_ = false;
       ROS_ERROR("Could not load kdl tree");
     }
-    ROS_INFO("Advertising services");
     jnt_to_pose_solver_.reset(new KDL::ChainFkSolverPos_recursive(kdl_chain_));
     node_handle_.param<int>("free_angle",free_angle_,2);
-
+    
     node_handle_.param<double>("search_discretization",search_discretization_,0.01);
     gaffa_arm_ik_solver_.reset(new gaffa_arm_kinematics::GaffaArmIKSolver(robot_model,root_name_,tip_name, search_discretization_,free_angle_));
+    
+    ROS_INFO("Checking Active...");
     if(!gaffa_arm_ik_solver_->active_)
     {
       ROS_ERROR("Could not load ik");
@@ -82,7 +83,6 @@ namespace gaffa_arm_kinematics {
     }
     else
     {
-
       gaffa_arm_ik_solver_->getSolverInfo(ik_solver_info_);
       gaffa_arm_kinematics::getKDLChainInfo(kdl_chain_,fk_solver_info_);
       fk_solver_info_.joint_names = ik_solver_info_.joint_names;
@@ -106,7 +106,7 @@ namespace gaffa_arm_kinematics {
 
       ik_solver_info_service_ = node_handle_.advertiseService(IK_INFO_SERVICE,&GaffaArmKinematics::getIKSolverInfo,this);
       fk_solver_info_service_ = node_handle_.advertiseService(FK_INFO_SERVICE,&GaffaArmKinematics::getFKSolverInfo,this);
-
+      
     }
   }
 

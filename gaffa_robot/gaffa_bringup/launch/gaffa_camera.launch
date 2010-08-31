@@ -1,10 +1,10 @@
 <launch>
 
   <!-- Webcam -->
-  <node name="camera" output="screen" pkg="usb_cam" type="usb_cam_node" respawn="false">
-    <param name="~pixel_format" value="yuyv" />
-    <param name="~image_width" value="320" />
-    <param name="~image_height" value="240" />
+  <node name="camera" output="screen" pkg="gscam" type="gscam" respawn="false">
+    <env name="GSCAM_CONFIG" value="v4l2src device=/dev/video0 ! videoscale ! video/x-raw-rgb, width=320, height=240 ! ffmpegcolorspace ! identity name=ros ! fakesink"/>
+    <remap from="/gscam/image_raw" to="/camera/image"/>
+    <remap from="/gscam/camera_info" to="/camera/camera_info"/>
   </node>
 
 </launch>

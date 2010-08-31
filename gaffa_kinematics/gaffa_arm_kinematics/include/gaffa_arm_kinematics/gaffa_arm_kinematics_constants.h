@@ -35,7 +35,7 @@
 
 namespace gaffa_arm_kinematics
 {
-  static const int NUM_JOINTS_ARM7DOF = 7;
+  static const int NUM_JOINTS_ARM_DOF = 4;
 
   static const double IK_EPS = 1e-5;
 }
