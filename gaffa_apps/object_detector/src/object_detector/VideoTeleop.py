@@ -24,8 +24,11 @@ import gaffa_teleop.LynxmotionArmDescription
 from lynxmotion_arm.SSC32Driver import ServoConfig
 from gaffa_teleop.RoboticArm import DHFrame, RoboticArm
 import sensor_msgs.msg
-from Homography.WorldScreenHomography import WorldScreenHomography
 from Homography.JointScreenHomography import JointScreenHomography
+
+
+
+
 
 #-------------------------------------------------------------------------------
 def getArmServoConfig():
@@ -65,47 +68,38 @@ class MainWindow:
     GRIPPER_DETECTION_TIME = 9.0    # Should be less than BUFFER_TIME_LENGTH
     GRIPPER_DETECTION_WAVE_START_TIME = 3.0
     
-    CORNER_ARM_POSITIONS = [
-        ArmPos( {
-            "base_rotate" : math.radians( 72.65 ), 
-            "shoulder_rotate" : math.radians( 75.99 ), 
-            "elbow_rotate" : math.radians( -97.34 ), 
-            "wrist_rotate" : math.radians( 80.05 ),
-            "gripper_rotate" : math.radians( -0.03 ) },
-            ( 100, 85 ) ),
-        ArmPos( {
-            "base_rotate" : math.radians( 85.0 ), 
-            "shoulder_rotate" : math.radians( 72.59 ), 
-            "elbow_rotate" : math.radians( -107.21 ), 
-            "wrist_rotate" : math.radians( 87.14 ),
-            "gripper_rotate" : math.radians( -67.23 ) },
-            ( 97, 170 ) ),
-        ArmPos( {
-            "base_rotate" : math.radians( 0.0 ), 
-            "shoulder_rotate" : math.radians( 57.32 ), 
-            "elbow_rotate" : math.radians( -116.48 ), 
-            "wrist_rotate" : math.radians( 130.12 ),
-            "gripper_rotate" : math.radians( 0.00 ) },
-            ( 247, 165 ) ),
-        ArmPos( {
-            "base_rotate" : math.radians( 0.0 ), 
-            "shoulder_rotate" : math.radians( 57.32 ), 
-            "elbow_rotate" : math.radians( -116.48 ), 
-            "wrist_rotate" : math.radians( 130.12 ),
-            "gripper_rotate" : math.radians( 0.00 ) },
-            ( 247, 165 ) ) ]
-            
-    WORLD_POSITIONS = [
-        ( 0, 0 ),
-        ( 20, 0 ),
-        ( 20, 29 ),
-        ( 0, 29 ) ]
+    # 49, 81 -> 52.05, 15.62, -34.16, 81.33         -  Top Left
+    # 218, 76 -> 28.19, 58.89, -105.32, 48.80       - Top Right
+    # 283, 135 -> 79.16, 67.70, -119.55, 48.80      - Bottom Right
+    # 56, 142 -> 78.61, 29.24, -50.29, 65.60        - Bottom Left
         
-    SCREEN_POSITIONS = [
-        ( 65, 31 ),
-        ( 178, 54 ),
-        ( 242, 194 ),
-        ( 90, 196 ) ]
+    CORNER_JOINT_ARRAYS = [
+        [ math.radians( 52.05 ), # Top Left
+          math.radians( 15.62 ),
+          math.radians( -34.16 ), 
+          math.radians( 81.33 ),
+          math.radians( 0.0 ) ],
+        [ math.radians( 28.19 ), # Top Right
+          math.radians( 58.89 ),
+          math.radians( -105.32 ), 
+          math.radians( 48.80 ),
+          math.radians( 0.0 ) ],
+        [ math.radians( 79.16 ), # Bottom Right
+          math.radians( 67.70 ),
+          math.radians( -119.55 ), 
+          math.radians( 48.80 ),
+          math.radians( 0.0 ) ],
+        [ math.radians( 78.61 ), # Bottom Left
+          math.radians( 29.24 ),
+          math.radians( -50.29 ), 
+          math.radians( 65.60 ),
+          math.radians( 0.0 ) ] ]
+        
+    CORNER_SCREEN_POSITIONS = [
+        ( 49, 81 ),     # Top Left
+        ( 218, 76 ),    # Top Right
+        ( 283, 135 ),   # Bottom Right
+        ( 56, 142 ) ]   # Bottom Left
  
     #---------------------------------------------------------------------------
     def __init__( self ):
@@ -125,8 +119,8 @@ class MainWindow:
         self.cameraImageTopic = rospy.Subscriber( "/camera/image", 
             sensor_msgs.msg.Image, self.cameraImageCallback )
             
-        self.worldScreenHomography = WorldScreenHomography( 
-            self.WORLD_POSITIONS, self.SCREEN_POSITIONS )
+        self.jointScreenHomography = JointScreenHomography( 
+            self.CORNER_JOINT_ARRAYS, self.CORNER_SCREEN_POSITIONS, self.roboticArm )
         
         # Setup the GUI        
         builder = gtk.Builder()
@@ -204,10 +198,22 @@ class MainWindow:
         
             screenX = data.x - imgRect.x 
             screenY = data.y - imgRect.y
-            ( worldX, worldY ) = self.worldScreenHomography.convertScreenPosToWorldPos(
+            jointArray = self.jointScreenHomography.convertScreenPosToJointPos(
                 ( screenX, screenY ) )
+            jointArrayDegrees = [ math.degrees( angle ) for angle in jointArray ]
             
-            print "press at", screenX, screenY, "->", worldX, worldY
+            print "press at", screenX, screenY, "->", jointArrayDegrees
+            print self.roboticArm.GetEndEffectorPos( jointArray )
+            
+            servoAnglesDict = {
+                "base_rotate" : jointArray[ 0 ], 
+                "shoulder_rotate" : jointArray[ 1 ], 
+                "elbow_rotate" : jointArray[ 2 ], 
+                "wrist_rotate" : jointArray[ 3 ],
+                "gripper_rotate" : jointArray[ 4 ]
+            }
+
+            self.moveArmToJointAnglePosition( servoAnglesDict, math.radians( 0.5 ) )
     
     #---------------------------------------------------------------------------
     def onDwgCameraImageExposeEvent( self, widget, data = None ):

@@ -445,10 +445,10 @@ class MainWindow:
                 graphicsContext.set_rgb_fg_color( gtk.gdk.Color( 0, 65535, 0 ) )
                 
                 blockCentreY = self.OPTICAL_FLOW_BLOCK_HEIGHT / 2
-                for y in range( self.opticalFlowX.height ):
+                for y in range( self.opticalFlowX.shape[ 0 ] ):
                 
                     blockCentreX = self.OPTICAL_FLOW_BLOCK_WIDTH / 2
-                    for x in range( self.opticalFlowX.width ):
+                    for x in range( self.opticalFlowX.shape[ 1 ] ):
                         
                         endX = blockCentreX + cv.Get2D( self.opticalFlowX, y, x )[ 0 ]
                         endY = blockCentreY + cv.Get2D( self.opticalFlowY, y, x )[ 0 ]
@@ -626,7 +626,7 @@ class MainWindow:
                             # Put the collected data in order
                             detectedGripperAngleBuffer = np.ndarray(shape=( maxNumGripperDetectionSamples ), dtype=np.float32)
             
-                            opticalFlowBufferShape = ( self.opticalFlowX.height, self.opticalFlowX.width, maxNumGripperDetectionSamples )
+                            opticalFlowBufferShape = ( self.opticalFlowX.shape[ 0 ], self.opticalFlowX.shape[ 1 ], maxNumGripperDetectionSamples )
                             detectedOpticalFlowBufferX = np.ndarray(shape=opticalFlowBufferShape, dtype=np.float32)
                             detectedOpticalFlowBufferY = np.ndarray(shape=opticalFlowBufferShape, dtype=np.float32)
         
@@ -710,7 +710,7 @@ class MainWindow:
             
             self.gripperAngleBuffer = np.ndarray(shape=( self.numBufferSamples ), dtype=np.float32)
             
-            opticalFlowBufferShape = ( self.opticalFlowX.height, self.opticalFlowX.width, self.numBufferSamples )
+            opticalFlowBufferShape = ( self.opticalFlowX.shape[ 0 ], self.opticalFlowX.shape[ 1 ], self.numBufferSamples )
             self.opticalFlowBufferX = np.ndarray(shape=opticalFlowBufferShape, dtype=np.float32)
             self.opticalFlowBufferY = np.ndarray(shape=opticalFlowBufferShape, dtype=np.float32)
         

@@ -7,11 +7,14 @@ class JointScreenHomography:
     '''Calculates the homography between a plane in world space and a plane in
        screen space. The world space plane is defined by 4 joint space positions'''
 
-    DEFAULT_VERTICAL_OFFSET = 0.03
+    DEFAULT_VERTICAL_OFFSET = 0.4
 
     #---------------------------------------------------------------------------
     def __init__( self, jointSpaceArrays, screenPositions, 
-        kinematicInterface, verticalOffset = self.DEFAULT_VERTICAL_OFFSET ):
+        kinematicInterface, verticalOffset = None ):
+
+        if verticalOffset == None:
+            verticalOffset = self.DEFAULT_VERTICAL_OFFSET
 
         assert len( jointSpaceArrays ) == 4
         assert len( screenPositions ) == 4
@@ -27,6 +30,7 @@ class JointScreenHomography:
             worldPos = self.kinematicInterface.GetEndEffectorPos( jointSpaceArrays[ posIdx ] )
             worldPositions.append( ( worldPos[ 0, 0 ], worldPos[ 1, 0 ] ) )
             
+            print worldPos[ 2, 0 ]
             self.worldPlaneHeight += worldPos[ 2, 0 ]
 
         # Crappy assumptions that

@@ -9,8 +9,7 @@
   <review status="unreviewed" notes=""/>
   <url>http://ros.org/wiki/gaffa_bringup</url>
   <depend package="lynxmotion_arm" />
-  <depend package="usb_cam" />
-  <depend package="gaffa_image_scale" />
+  <depend package="gscam" />
 
 </package>
 
