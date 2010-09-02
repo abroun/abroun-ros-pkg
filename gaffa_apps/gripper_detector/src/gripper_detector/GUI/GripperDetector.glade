@@ -116,6 +116,34 @@
               </packing>
             </child>
             <child>
+              <object class="GtkHBox" id="hbox2">
+                <property name="visible">True</property>
+                <child>
+                  <object class="GtkLabel" id="label1">
+                    <property name="visible">True</property>
+                    <property name="label" translatable="yes">Number of Waves:</property>
+                  </object>
+                  <packing>
+                    <property name="position">0</property>
+                  </packing>
+                </child>
+                <child>
+                  <object class="GtkSpinButton" id="spinNumWaves">
+                    <property name="visible">True</property>
+                    <property name="can_focus">True</property>
+                    <property name="invisible_char">&#x25CF;</property>
+                    <property name="adjustment">adjNumWaves</property>
+                  </object>
+                  <packing>
+                    <property name="position">1</property>
+                  </packing>
+                </child>
+              </object>
+              <packing>
+                <property name="position">8</property>
+              </packing>
+            </child>
+            <child>
               <object class="GtkButton" id="btnLocatePositions">
                 <property name="label" translatable="yes">Locate Positions</property>
                 <property name="visible">True</property>
@@ -124,7 +152,7 @@
                 <signal name="clicked" handler="onBtnLocatePositionsClicked"/>
               </object>
               <packing>
-                <property name="position">8</property>
+                <property name="position">9</property>
               </packing>
             </child>
           </object>
@@ -134,5 +162,11 @@
         </child>
       </object>
     </child>
+  </object>
+  <object class="GtkAdjustment" id="adjNumWaves">
+    <property name="lower">1</property>
+    <property name="upper">100</property>
+    <property name="step_increment">1</property>
+    <property name="page_increment">10</property>
   </object>
 </interface>

@@ -112,14 +112,13 @@ class MainWindow:
     OPTICAL_FLOW_RANGE_HEIGHT = 8
     
     GRIPPER_WAVE_FREQUENCY = 1.0    # Waves per second
-    GRIPPER_NUM_WAVES = 3.0
     GRIPPER_WAVE_AMPLITUDE = math.radians( 20.0 )/4.0
     
-    BUFFER_TIME_LENGTH = 10.0
+    BUFFER_TIME_LENGTH = 100.0   # Should be greater that the total gripper detection time
     SAMPLES_PER_SECOND = 15.0
-    MAX_CORRELATION_LAG = 1.0
-    GRIPPER_DETECTION_TIME = 9.0    # Should be less than BUFFER_TIME_LENGTH
+    MAX_CORRELATION_LAG = 1.0  
     GRIPPER_DETECTION_WAVE_START_TIME = 3.0
+    POST_WAVE_WAIT_TIME = 3.0
     
     TEST_ARM_POSITIONS = [
         ArmPos( {
@@ -197,6 +196,11 @@ class MainWindow:
         self.checkShowDetectedMotionBlocks = builder.get_object( "checkShowDetectedMotionBlocks" )
         self.checkShowCAMShiftTracking = builder.get_object( "checkShowCAMShiftTracking" )
         self.checkShowGripperProbability = builder.get_object( "checkShowGripperProbability" )
+        self.adjNumWaves = builder.get_object( "adjNumWaves" )
+        
+        # Set default values
+        self.adjNumWaves.set_value( 3 )
+        
         builder.connect_signals( self )
                
         updateLoop = self.update()
@@ -248,7 +252,11 @@ class MainWindow:
                 backproject = cv.CreateImage(cv.GetSize(imageRGB), 8, 1)
 
                 # Run the cam-shift
-                cv.CalcArrBackProject( planes, backproject, self.gripperHistogram )
+                try:
+                    cv.CalcArrBackProject( planes, backproject, self.gripperHistogram )
+                except e:
+                    print "Got", e
+                    print "self.gripperHistogram =", self.gripperHistogram
                 
                 if self.gripperTrackWindow[ 2 ] > 0 and self.gripperTrackWindow[ 3 ] > 0:
                     crit = ( cv.CV_TERMCRIT_EPS | cv.CV_TERMCRIT_ITER, 10, 1)
@@ -365,6 +373,12 @@ class MainWindow:
         self.gripperDetectionStartSampleIdx = self.curSampleIdx
         self.gripperDetectionWaveStarted = False
         self.btnDetectGripper.set_sensitive( False )
+        self.totalGripperDetectionTime = \
+            self.GRIPPER_DETECTION_WAVE_START_TIME \
+            + self.adjNumWaves.get_value()/self.GRIPPER_WAVE_FREQUENCY \
+            + self.POST_WAVE_WAIT_TIME
+        assert self.totalGripperDetectionTime < self.BUFFER_TIME_LENGTH
+            
         self.tryingToDetectGripper = True
         
     #---------------------------------------------------------------------------
@@ -578,7 +592,7 @@ class MainWindow:
                 if self.wavingGripper:
                     
                     waveTime = curTime - self.gripperWaveStartTime
-                    totalWaveTime = self.GRIPPER_NUM_WAVES / self.GRIPPER_WAVE_FREQUENCY
+                    totalWaveTime = self.numWaves / self.GRIPPER_WAVE_FREQUENCY
                     waveFinished = False
                     
                     if waveTime >= totalWaveTime:
@@ -612,7 +626,7 @@ class MainWindow:
                     
                     # Update gripper detection if it's on-going
                     if self.tryingToDetectGripper:
-                        maxNumGripperDetectionSamples = int( self.GRIPPER_DETECTION_TIME*self.SAMPLES_PER_SECOND )
+                        maxNumGripperDetectionSamples = int( self.totalGripperDetectionTime*self.SAMPLES_PER_SECOND )
                         gripperDetectionWaveStartSampleIdx = int( self.GRIPPER_DETECTION_WAVE_START_TIME*self.SAMPLES_PER_SECOND )
                         
                         if self.curSampleIdx > self.gripperDetectionStartSampleIdx:
@@ -722,6 +736,7 @@ class MainWindow:
         
         waveStarted = False
         if self.wavingGripper == False:
+            self.numWaves = self.adjNumWaves.get_value()
             self.gripperWaveStartTime = time.clock()
             self.wavingGripper = True
             waveStarted = True
