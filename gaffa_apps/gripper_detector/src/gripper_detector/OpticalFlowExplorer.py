@@ -34,7 +34,13 @@ from matplotlib.backends.backend_gtkagg import FigureCanvasGTKAgg as FigureCanva
 from matplotlib.backends.backend_gtkagg import NavigationToolbar2GTKAgg as NavigationToolbar
 
 from abroun_gtk_gui.widgets import SequenceControl
-from OpticalFlowFilter import OpticalFlowFilter
+
+import OpticalFlow.Utils as Utils
+from OpticalFlow.InputSequence import InputSequence
+from OpticalFlow.RegularisedInputSequence import RegularisedInputSequence
+from OpticalFlow.CrossCorrelatedSequence import CrossCorrelatedSequence
+from OpticalFlow.ROCCurve import ROCCurve
+import OpticalFlow.MarkerBuffer as MarkerBuffer
 
 def printTiming(func):
     def wrapper(*arg):
@@ -47,97 +53,6 @@ def printTiming(func):
         return res
 
     return wrapper
-        
-#-------------------------------------------------------------------------------
-# Calculates the cross correlation of a sequence for all possible lags
-def crossCorrelateComplete( sequence, laggedSequence, maxLag = None ):
-
-    if maxLag != None:
-        numCorrelations = maxLag + 1
-    else:
-        numCorrelations = len( sequence )
-
-    # x
-    x = sequence
-    sum_x = np.add.accumulate( x[ ::-1 ] )[ ::-1 ] 
-    sum_x2 = np.add.accumulate( np.square( x )[ ::-1 ] )[ ::-1 ] 
-    len_x = np.arange( len( x ), 0, -1 )
-
-    #var_x = np.divide( np.subtract( np.multiply( sum_x2, len_x ), np.square( sum_x ) ), np.square( len_x ) )
-    var_x = np.subtract( np.multiply( sum_x2, len_x ), np.square( sum_x ) )
-
-    # y
-    y = laggedSequence
-
-    sum_y = np.add.accumulate( y )
-    sum_y2 = np.add.accumulate( np.square( y ) )
-    len_y = np.arange( 1, len( y ) + 1, 1 )
-
-    #var_y = np.divide( np.subtract( np.multiply( sum_y2, len_y ), np.square( sum_y ) ), np.square( len_y ) )
-    var_y = np.subtract( np.multiply( sum_y2, len_y ), np.square( sum_y ) )
-
-    # xy
-    sum_xy = np.correlate( x, y, mode="full" )[ len( x ) - 1: ]
-    #cov_xy = np.divide( np.subtract( np.multiply( sum_xy, len_x ), np.multiply( sum_x, sum_y[::-1] ) ), np.square( len_x ) )
-    cov_xy = np.subtract( np.multiply( sum_xy[ : numCorrelations], len_x[ : numCorrelations] ), np.multiply( sum_x[ : maxLag+1], sum_y[::-1][ : numCorrelations] ) )
-
-    corrCoeff = np.divide( cov_xy, np.sqrt( np.multiply( var_x[ : numCorrelations], var_y[ ::-1 ][ : numCorrelations] ) ) )
-    corrCoeff[ np.logical_or( np.isnan( corrCoeff ), np.isinf( corrCoeff ) ) ] = 0.0
-    
-    return corrCoeff
- 
-#-------------------------------------------------------------------------------   
-def isInputSignalPresent( maxCorrCoeffX, maxCorrCoeffY ):
-    
-    #return ( maxCorrCoeffX > 0.5 or maxCorrCoeffY > 0.5 \
-        #or maxCorrCoeffX + maxCorrCoeffY > 1.2 )
-        
-    return ( maxCorrCoeffX > 0.63 or maxCorrCoeffY > 0.63 )
-        
-#-------------------------------------------------------------------------------   
-def isInputSignalPresentThreshold( maxCorrCoeffX, maxCorrCoeffY, threshold ):
-    
-    #return ( maxCorrCoeffX > threshold or maxCorrCoeffY > threshold \
-     #   or maxCorrCoeffX + maxCorrCoeffY > 1.2 )
-    return maxCorrCoeffX > threshold or maxCorrCoeffY > threshold
-            
-#-------------------------------------------------------------------------------
-# Normalises a sequence of numbers by subtracting the mean and then dividing
-# by the standard deviation. This means that the sequence is centred at 0 and
-# 'mostly' within the range [-1,1]
-def normaliseSequence( sequence ):
-    
-    result = []
-    
-    numElements = len( sequence )
-    if numElements > 0:
-        
-        mean = sum( sequence )/numElements
-        
-        deviations = [ element - mean for element in sequence ]
-        #stdDev = math.sqrt( sum( [ deviation*deviation for deviation in deviations ] ) / numElements )
-        maxVal = math.sqrt( max( [ deviation*deviation for deviation in deviations ] ) )
-        
-        if maxVal == 0:
-            result = deviations
-        else:
-            result = [ deviation / maxVal for deviation in deviations ]
-        
-    return result
-    
-#-------------------------------------------------------------------------------
-def resampleSequence( sequenceData, sequenceTimes, newSequenceTimes ):
-    
-    # Construct a spline to represent the sequence
-    tck = scipy.interpolate.splrep( sequenceTimes, sequenceData )
-
-    # Evaluate spline at new sample points
-    return scipy.interpolate.splev( newSequenceTimes,tck )
-    
-#-------------------------------------------------------------------------------
-def calculateEvolvingCrossCorrelation( sequence, laggedSequence, lag ):
-    return [ crossCorrelate( sequence[:sliceLength], laggedSequence, lag ) \
-        for sliceLength in range( 1, len( sequence ) + 1 ) ]
 
 #-------------------------------------------------------------------------------
 class MainWindow:
@@ -149,11 +64,17 @@ class MainWindow:
     OPTICAL_FLOW_METHOD = "BlockMatching"
     #OPTICAL_FLOW_METHOD = "LucasKanade"
     #OPTICAL_FLOW_METHOD = "HornSchunck"
+    COMBINATION_METHOD = "NoChange"
     
+    #GROUND_TRUTH_FILENAME = "/../../config/TopPosGripper.yaml"
+    GROUND_TRUTH_FILENAME = "/../../config/ExperimentPosGripper.yaml"
+    
+    CORRELATION_THRESHOLD = 0.63
     MAX_TEST_POINT_X = (320 - OPTICAL_FLOW_BLOCK_WIDTH)/OPTICAL_FLOW_BLOCK_WIDTH - 1
     MAX_TEST_POINT_Y = (240 - OPTICAL_FLOW_BLOCK_HEIGHT)/OPTICAL_FLOW_BLOCK_HEIGHT - 1
     
     SAMPLES_PER_SECOND = 30.0
+    MAX_CORRELATION_LAG = 1.0
     
     GRIPPER_WAVE_FREQUENCY = 1.0    # Waves per second
     GRIPPER_NUM_WAVES = 3.0
@@ -167,140 +88,50 @@ class MainWindow:
         self.bagFilename = bagFilename
         self.lastImageGray = None
         
-        self.wavingGripper = False
-        self.gripperWaveStartTime = None
-        
-        servoAngleTimes = []
-        servoAngleData = []
-        self.cameraImages = []
-        
-        self.opticalFlowFilter = OpticalFlowFilter(
-            self.OPTICAL_FLOW_BLOCK_WIDTH, self.OPTICAL_FLOW_BLOCK_HEIGHT,
-            self.OPTICAL_FLOW_RANGE_WIDTH, self.OPTICAL_FLOW_RANGE_HEIGHT )
-            
-        # Create storage for the optical flow
-        numImages = 0
-        lastCameraTime = None
-        opticalFlowWidth = 0
-        opticalFlowHeight = 0
-        for topic, msg, t in rosrecord.logplayer( bagFilename ):
-            if msg._type == "sensor_msgs/Image":
-                
-                if numImages == 0:
-                    opticalFlowWidth = self.opticalFlowFilter.calcOpticalFlowWidth( msg.width )
-                    opticalFlowHeight = self.opticalFlowFilter.calcOpticalFlowHeight( msg.height )
-                    lastCameraTime = t
-                    numImages = 1
-                    
-                else:
-                    if t != lastCameraTime:
-                        numImages += 1
-                        lastCameraTime = t
-        
-        self.imageTimes = np.ndarray(shape=( numImages ), dtype=np.float32)
-        opticalFlowArrayShape = ( opticalFlowHeight, opticalFlowWidth, numImages )
-        self.opticalFlowArraysX = np.ndarray(shape=opticalFlowArrayShape, dtype=np.float32)
-        self.opticalFlowArraysY = np.ndarray(shape=opticalFlowArrayShape, dtype=np.float32)
-        
-        imgIdx = 0
-        
-        lastAngleTime = None
-        lastCameraTime = None
-        
+        # Read in sequence
         t1 = time.time()
         
-        # Extract messages from the bag
-        startTime = None
-        for topic, msg, t in rosrecord.logplayer( bagFilename ):
-            if startTime == None:
-                startTime = t
-                
-            bagTime = t - startTime
-                
-            if msg._type == "arm_driver_msgs/SetServoAngles" \
-                and bagTime != lastAngleTime:
-                
-                lastAngleTime = bagTime
-                servoAngleTimes.append( bagTime.to_sec() )
-                
-                servoAngle = msg.servoAngles[ 0 ].angle
-                servoAngleData.append( servoAngle )
-                
-            elif msg._type == "sensor_msgs/Image" \
-                and bagTime != lastCameraTime:
-                
-                opticalFlowArrayX, opticalFlowArrayY = self.processCameraImage( msg )
-
-                lastCameraTime = bagTime
-                self.imageTimes[ imgIdx ] = bagTime.to_sec()
-                self.cameraImages.append( msg )
-                
-                self.opticalFlowArraysX[ :, :, imgIdx ] = np.array( opticalFlowArrayX )
-                self.opticalFlowArraysY[ :, :, imgIdx ] = np.array( opticalFlowArrayY )
-                
-                imgIdx += 1
-
+        self.inputSequence = InputSequence( bagFilename )
+        self.inputSequence.addDistractorObjects( 4 )
+        self.inputSequence.calculateOpticalFlow(
+            self.OPTICAL_FLOW_BLOCK_WIDTH, self.OPTICAL_FLOW_BLOCK_HEIGHT,
+            self.OPTICAL_FLOW_RANGE_WIDTH, self.OPTICAL_FLOW_RANGE_HEIGHT,
+            self.OPTICAL_FLOW_METHOD )
+            
         t2 = time.time()
         print 'Processing sequence took %0.3f ms' % ((t2-t1)*1000.0)
         
-        #self.opticalFlowArraysX = np.negative( self.opticalFlowArraysX )
-        #self.opticalFlowArraysY = np.negative( self.opticalFlowArraysY )
-        
-        temp = self.opticalFlowArraysX
-        #self.opticalFlowArraysX = np.add( self.opticalFlowArraysX, self.opticalFlowArraysY )
-        #self.opticalFlowArraysY = np.subtract( temp, self.opticalFlowArraysY )
-        #self.opticalFlowArraysY = np.zeros(shape=opticalFlowArrayShape, dtype=np.float32)
-
-        # Construct regular sampled data from the input servo data
-        servoAngleData = normaliseSequence( servoAngleData )
-        dataDuration = math.floor( self.imageTimes[ -1 ] )
-        
-        self.regularSampleTimes = np.arange( 0.0, dataDuration, 1.0/self.SAMPLES_PER_SECOND )
-        
+        # Resample sequence
         t1 = time.time()
-        # Pad the servo readings with zeros at the start and end
-        preTimes = np.arange( 0.0, servoAngleTimes[ 0 ], 0.1 )
-        preReadings = np.zeros( len( preTimes ) )
-        postTimes = np.arange( servoAngleTimes[ -1 ] + 0.1, dataDuration + 1.0, 0.1 )
-        postReadings = np.zeros( len( postTimes ) )
         
-        npAngleTimes = np.concatenate( [ preTimes, np.array( servoAngleTimes ), postTimes ] )
-        npAngleData = np.concatenate( [ preReadings, np.array( servoAngleData ), postReadings ] )
-        
-        self.regularServoAngleData = resampleSequence( 
-            npAngleData, npAngleTimes, self.regularSampleTimes )
-                    
-        self.regularOpticalFlowArrayX = np.apply_along_axis( resampleSequence, 2, 
-            self.opticalFlowArraysX, self.imageTimes, self.regularSampleTimes )
-        self.regularOpticalFlowArrayY = np.apply_along_axis( resampleSequence, 2, 
-            self.opticalFlowArraysY, self.imageTimes, self.regularSampleTimes )
-        
+        self.regularisedInputSequence = RegularisedInputSequence( 
+            self.inputSequence, self.SAMPLES_PER_SECOND )
+            
         t2 = time.time()
         print 'Resampling took %0.3f ms' % ((t2-t1)*1000.0)
+        
+        
                     
         t1 = time.time()
         
-        maxLag = int( 1.0 * self.SAMPLES_PER_SECOND )
-        self.correlationsX = np.apply_along_axis( crossCorrelateComplete, 2, 
-            self.regularOpticalFlowArrayX, self.regularServoAngleData, maxLag )
-        self.correlationsY = np.apply_along_axis( crossCorrelateComplete, 2, 
-            self.regularOpticalFlowArrayY, self.regularServoAngleData, maxLag )
+        self.crossCorrelatedSequence = CrossCorrelatedSequence( 
+            self.regularisedInputSequence, 
+            self.MAX_CORRELATION_LAG, self.COMBINATION_METHOD )
         
         t2 = time.time()
         print 'Correlation took %0.3f ms' % ((t2-t1)*1000.0)
         
         # Detect the input signal based on the correlation in the x and y axis
-        self.maxCorrelationArrayX = np.maximum.reduce( np.absolute( self.correlationsX ), axis=2 )
-        self.maxCorrelationArrayY = np.maximum.reduce( np.absolute( self.correlationsY ), axis=2 )
-        self.inputSignalDetectedArray = np.frompyfunc( isInputSignalPresent, 2, 1 )(
-            self.maxCorrelationArrayX, self.maxCorrelationArrayY )
+        self.inputSignalDetectedArray = \
+            self.crossCorrelatedSequence.detectInputSequence( self.CORRELATION_THRESHOLD )
           
         # Build a histogram for the gripper  
         self.gripperHistogram = cv.CreateHist( 
             [ 256/8, 256/8, 256/8 ], cv.CV_HIST_ARRAY, [ (0,255), (0,255), (0,255) ], 1 )
             
-        imageRGB = cv.CreateImageHeader( ( self.cameraImages[ 0 ].width, self.cameraImages[ 0 ].height ), cv.IPL_DEPTH_8U, 3 )
-        cv.SetData( imageRGB, self.cameraImages[ 0 ].data, self.cameraImages[ 0 ].step )
+        firstImage = self.inputSequence.cameraImages[ 0 ]
+        imageRGB = cv.CreateImageHeader( ( firstImage.shape[ 1 ], firstImage.shape[ 0 ] ), cv.IPL_DEPTH_8U, 3 )
+        cv.SetData( imageRGB, firstImage.data, firstImage.shape[ 1 ]*3 )
             
         r_plane = cv.CreateMat( imageRGB.height, imageRGB.width, cv.CV_8UC1 )
         g_plane = cv.CreateMat( imageRGB.height, imageRGB.width, cv.CV_8UC1 )
@@ -323,7 +154,11 @@ class MainWindow:
         cv.CalcHist( [ cv.GetImage( i ) for i in planes ], 
             self.gripperHistogram, 0, mask=maskArray )
         
-        self.calculateROCCurveData()
+        markerBuffer = MarkerBuffer.loadMarkerBuffer( self.scriptPath + self.GROUND_TRUTH_FILENAME )
+        if markerBuffer == None:
+            raise Exception( "Unable to load marker buffer" )
+        
+        self.rocCurve = ROCCurve( self.crossCorrelatedSequence, markerBuffer )
         
         # Create the matplotlib graph
         self.figure = Figure( figsize=(8,6), dpi=72 )
@@ -347,7 +182,7 @@ class MainWindow:
         self.adjTestPointX.set_upper( self.MAX_TEST_POINT_X )
         self.adjTestPointY.set_upper( self.MAX_TEST_POINT_Y )
         self.sequenceControls = builder.get_object( "sequenceControls" )
-        self.sequenceControls.setNumFrames( len( self.cameraImages ) )
+        self.sequenceControls.setNumFrames( len( self.inputSequence.cameraImages ) )
         self.sequenceControls.setOnFrameIdxChangedCallback( self.onSequenceControlsFrameIdxChanged )
         self.setFrameIdx( 0 )
         self.processOpticalFlowData()
@@ -371,96 +206,42 @@ class MainWindow:
         gtk.main()
         
     #---------------------------------------------------------------------------
-    def calculateROCCurveData( self ):
-        
-        # Load in the 'ground truth' for the sequence
-        #GROUND_TRUTH_FILENAME = self.scriptPath + "/../../config/TopPosGripper.yaml"
-        GROUND_TRUTH_FILENAME = self.scriptPath + "/../../config/ExperimentPosGripper.yaml"
-        THRESHOLD_STEP_SIZE = 0.01
-        
-        markerFile = file( GROUND_TRUTH_FILENAME, "r" )
-        markerBuffer = yaml.load( markerFile )
-        markerBufferLoaded = False
-            
-        if type( markerBuffer ) == list:
-            markerBuffer = np.array( markerBuffer )
-            if len( markerBuffer.shape ) == 2:
-                
-                markerBufferLoaded = True
-            else:
-                print "Error: The data is not a 2D list"
-        else:
-            print "Error: The data is not a list"
-    
-        if not markerBufferLoaded:
-            return
-        
-        positiveNegativeCounts = np.bincount( markerBuffer.flat )
-        actualNegativeCount = positiveNegativeCounts[ 0 ]
-        actualPositiveCount = positiveNegativeCounts[ 1 ]
-        
-        self.truePositiveRates = []
-        self.falsePositiveRates = []
-        self.sensitivity = self.truePositiveRates
-        self.specificity = []
-        self.thresholds = np.arange( 0.0, 1.0 + THRESHOLD_STEP_SIZE, THRESHOLD_STEP_SIZE )
-        
-        # Calculate the true positive rate and false positive rate for each
-        # threshold value
-        for threshold in self.thresholds:
-            
-            thresholdFunc = np.frompyfunc( isInputSignalPresentThreshold, 3, 1 )
-            inputSignalDetectedArray = thresholdFunc(
-                self.maxCorrelationArrayX, self.maxCorrelationArrayY, threshold )
-            
-            numTruePositives = 0
-            numFalsePositives = 0
-            
-            for rowIdx in range( markerBuffer.shape[ 0 ] ):
-                for colIdx in range( markerBuffer.shape[ 1 ] ):
-                    
-                    if inputSignalDetectedArray[ rowIdx, colIdx ]:
-                        
-                        if markerBuffer[ rowIdx, colIdx ]:
-                            numTruePositives += 1
-                        else:
-                            numFalsePositives += 1
-        
-            self.truePositiveRates.append( float( numTruePositives ) / float( actualPositiveCount ) )
-            self.falsePositiveRates.append( float( numFalsePositives ) / float( actualNegativeCount ) )
-            self.specificity.append( 1.0 - self.falsePositiveRates[ -1 ] )
-        
-    #---------------------------------------------------------------------------
     def processOpticalFlowData( self ):
 
         testX = int( self.adjTestPointX.get_value() )
         testY = int( self.adjTestPointY.get_value() )
         
-        regularOpticalFlowDataX = self.regularOpticalFlowArrayX[ testY ][ testX ]
-        regularOpticalFlowDataX = normaliseSequence( regularOpticalFlowDataX )
-        regularOpticalFlowDataY = self.regularOpticalFlowArrayY[ testY ][ testX ]
-        regularOpticalFlowDataY = normaliseSequence( regularOpticalFlowDataY )
+        regSeq = self.regularisedInputSequence
+        corSeq = self.crossCorrelatedSequence
         
-        crossCorrelationOpticalFlowX = self.correlationsX[ testY ][ testX ]
-        crossCorrelationOpticalFlowY = self.correlationsY[ testY ][ testX ]
+        # Normalise the data ready for display
+        normalisedServoAngleData = Utils.normaliseSequence( regSeq.regularServoAngleData )
+        normalisedOpticalFlowDataX = Utils.normaliseSequence( regSeq.regularOpticalFlowArrayX[ testY ][ testX ] )
+        normalisedOpticalFlowDataY = Utils.normaliseSequence( regSeq.regularOpticalFlowArrayY[ testY ][ testX ] )
+        
+        numCorrelationChannels = len( corSeq.correlationChannels )
         
         # Plot graphs
         self.axisX.clear()
-        self.axisX.plot( self.regularSampleTimes, self.regularServoAngleData )
-        self.axisX.plot( self.regularSampleTimes, regularOpticalFlowDataX )
-        self.axisX.plot( self.regularSampleTimes[:len(crossCorrelationOpticalFlowX)], crossCorrelationOpticalFlowX )
-        #self.axisX.plot( self.regularSampleTimes, evolvingCCOpticalFlowX )
+        self.axisX.plot( regSeq.regularSampleTimes, normalisedServoAngleData )
+        self.axisX.plot( regSeq.regularSampleTimes, normalisedOpticalFlowDataX )
+        
+        if numCorrelationChannels >= 1:
+            correlationChannel = corSeq.correlationChannels[ 0 ][ testY ][ testX ]
+            self.axisX.plot( regSeq.regularSampleTimes[:len(correlationChannel)], correlationChannel )
         
         self.axisY.clear()
-        self.axisY.plot( self.regularSampleTimes, self.regularServoAngleData )
-        self.axisY.plot( self.regularSampleTimes, regularOpticalFlowDataY )
-        self.axisY.plot( self.regularSampleTimes[:len(crossCorrelationOpticalFlowY)], crossCorrelationOpticalFlowY )
-        #self.axisY.plot( self.regularSampleTimes, evolvingCCOpticalFlowY )
+        self.axisY.plot( regSeq.regularSampleTimes, normalisedServoAngleData )
+        self.axisY.plot( regSeq.regularSampleTimes, normalisedOpticalFlowDataY )
+        
+        if numCorrelationChannels >= 2:
+            correlationChannel = corSeq.correlationChannels[ 1 ][ testY ][ testX ]
+            self.axisY.plot( regSeq.regularSampleTimes[:len(correlationChannel)], correlationChannel )
         
         self.axisROC.clear()
-        self.axisROC.plot( self.falsePositiveRates, self.truePositiveRates )
-        #self.axisROC.plot( self.thresholds, self.sensitivity )
-        #self.axisROC.plot( self.thresholds, self.specificity )
+        self.axisROC.plot( self.rocCurve.falsePositiveRates, self.rocCurve.truePositiveRates )
+        #self.axisROC.plot( self.rocCurve.thresholds, self.rocCurve.sensitivity )
+        #self.axisROC.plot( self.rocCurve.thresholds, self.rocCurve.specificity )
         
         self.refreshGraphDisplay()
     
@@ -487,29 +268,6 @@ class MainWindow:
         self.vboxMain.pack_start( self.navToolbar, expand=False, fill=False )
         self.navToolbar.show()
         self.vboxMain.show()
-        
-    #---------------------------------------------------------------------------
-    def processCameraImage( self, rosImage ):
-        
-        opticalFlowArrayX = None
-        opticalFlowArrayY = None
-        
-        if rosImage.encoding == "rgb8" or rosImage.encoding == "bgr8":
-            
-            # Create an OpenCV image to process the data
-            curImageRGB = cv.CreateImageHeader( ( rosImage.width, rosImage.height ), cv.IPL_DEPTH_8U, 3 )
-            cv.SetData( curImageRGB, rosImage.data, rosImage.step )
-            curImageGray = cv.CreateImage( ( rosImage.width, rosImage.height ), cv.IPL_DEPTH_8U, 1 )
-            cv.CvtColor( curImageRGB, curImageGray, cv.CV_RGB2GRAY )
-            
-            # Look for optical flow between this image and the last one
-            opticalFlowArrayX, opticalFlowArrayY = \
-                self.opticalFlowFilter.calcOpticalFlow( curImageGray, self.OPTICAL_FLOW_METHOD )
-            
-        else:
-            rospy.logerr( "Unhandled image encoding - " + rosImage.encoding )
-            
-        return ( opticalFlowArrayX, opticalFlowArrayY )
     
     #---------------------------------------------------------------------------
     def setFrameIdx( self, frameIdx ):
@@ -517,19 +275,23 @@ class MainWindow:
         self.frameIdx = frameIdx
         
         # Display the frame
-        image = self.cameraImages[ frameIdx ]
+        image = self.inputSequence.cameraImages[ frameIdx ]
+        imageWidth = image.shape[ 1 ]
+        imageHeight = image.shape[ 0 ]
+        imageStep = imageWidth*3
+        
         self.cameraImagePixBuf = gtk.gdk.pixbuf_new_from_data( 
-            image.data, 
+            image.tostring(), 
             gtk.gdk.COLORSPACE_RGB,
             False,
             8,
-            image.width,
-            image.height,
-            image.step )
+            imageWidth,
+            imageHeight,
+            imageStep )
             
         # Track gripper
-        imageRGB = cv.CreateImageHeader( ( image.width, image.height ), cv.IPL_DEPTH_8U, 3 )
-        cv.SetData( imageRGB, image.data, image.step )
+        imageRGB = cv.CreateImageHeader( ( imageWidth, imageHeight ), cv.IPL_DEPTH_8U, 3 )
+        cv.SetData( imageRGB, image.data, imageStep )
         imageRGB = cv.CloneImage( imageRGB )
             
         r_plane = cv.CreateMat( imageRGB.height, imageRGB.width, cv.CV_8UC1 )
@@ -556,8 +318,8 @@ class MainWindow:
         
 
         # Resize the drawing area if necessary
-        if self.dwgCameraImage.get_size_request() != ( image.width, image.height ):
-            self.dwgCameraImage.set_size_request( image.width, image.height )
+        if self.dwgCameraImage.get_size_request() != ( imageWidth, imageHeight ):
+            self.dwgCameraImage.set_size_request( imageWidth, imageHeight )
 
         self.dwgCameraImage.queue_draw()
     
@@ -627,8 +389,8 @@ class MainWindow:
             #return
                
             # Draw the optical flow if it's available
-            opticalFlowX = self.opticalFlowArraysX[ :, :, self.frameIdx ]
-            opticalFlowY = self.opticalFlowArraysY[ :, :, self.frameIdx ]
+            opticalFlowX = self.inputSequence.opticalFlowArraysX[ :, :, self.frameIdx ]
+            opticalFlowY = self.inputSequence.opticalFlowArraysY[ :, :, self.frameIdx ]
             if opticalFlowX != None and opticalFlowY != None:
                 
                 testX = int( self.adjTestPointX.get_value() )
@@ -709,30 +471,6 @@ class MainWindow:
             curTime = time.clock()
             
             if curTime - lastTime >= 1.0 / UPDATE_FREQUENCY:
-            
-                ## Update the wave if active
-                #if self.wavingGripper:
-                    
-                    #waveTime = curTime - self.gripperWaveStartTime
-                    #totalWaveTime = self.GRIPPER_NUM_WAVES / self.GRIPPER_WAVE_FREQUENCY
-                    #waveFinished = False
-                    
-                    #print waveTime, totalWaveTime
-                    #if waveTime >= totalWaveTime:
-                        
-                        #waveTime = totalWaveTime
-                        #waveFinished = True
-                        
-                    ## Work out the current displacement from the initial position
-                    #displacement = self.GRIPPER_WAVE_AMPLITUDE \
-                        #* math.sin( waveTime*self.GRIPPER_WAVE_FREQUENCY*2.0*math.pi )
-                    
-                    
-                    #servoAnglesDict = { "wrist_rotate" : self.wristAngle + displacement }
-                    
-                    #self.roboticArm.setJointAngles( servoAnglesDict )
-                    #if waveFinished:
-                        #self.wavingGripper = False
 
                 # Save the time
                 lastTime = curTime

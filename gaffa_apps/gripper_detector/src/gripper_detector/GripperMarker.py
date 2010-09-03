@@ -20,6 +20,7 @@ import gtk
 import gobject
 
 import sensor_msgs.msg
+import OpticalFlow.MarkerBuffer as MarkerBuffer
 
 #-------------------------------------------------------------------------------
 class MainWindow:
@@ -160,39 +161,28 @@ class MainWindow:
         filename = self.chooseMarkerFile()
         
         if filename != None:
-            markerFile = file( filename, "r" )
-            markerBuffer = yaml.load( markerFile )
+            markerBuffer = MarkerBuffer.loadMarkerBuffer( filename )
+            if markerBuffer != None:
             
-            if type( markerBuffer ) == list:
-                markerBuffer = np.array( markerBuffer )
-                if len( markerBuffer.shape ) == 2:
+                blockWidth = self.lastImage.width / (markerBuffer.shape[ 1 ] + 1)
+                blockHeight = self.lastImage.height / (markerBuffer.shape[ 0 ] + 1)
                     
-                    blockWidth = self.lastImage.width / (markerBuffer.shape[ 1 ] + 1)
-                    blockHeight = self.lastImage.height / (markerBuffer.shape[ 0 ] + 1)
+                if blockHeight < self.adjBlockHeight.get_upper() \
+                    and blockWidth < self.adjBlockWidth.get_upper():
                     
-                    if blockHeight < self.adjBlockHeight.get_upper() \
-                        and blockWidth < self.adjBlockWidth.get_upper():
+                    self.adjBlockWidth.set_value( blockWidth )
+                    self.adjBlockHeight.set_value( blockHeight )
+                    self.markerBuffer = markerBuffer
                         
-                        self.adjBlockWidth.set_value( blockWidth )
-                        self.adjBlockHeight.set_value( blockHeight )
-                        self.markerBuffer = markerBuffer
-                        
-                        # Successful so remember filename
-                        self.filename = filename
-                    else:
-                        print "Error: Invalid block width or height, please fix with Glade"
-            
+                    # Successful so remember filename
+                    self.filename = filename
                 else:
-                    print "Error: The data is not a 2D list"
-            else:
-                print "Error: The data is not a list"
-    
+                    print "Error: Invalid block width or height, please fix with Glade"
+                
     #---------------------------------------------------------------------------
     def saveData( self, filename ):
         
-        outputFile = file( self.filename, "w" )
-        yaml.dump( self.markerBuffer.tolist(), outputFile )
-        outputFile.close()
+        MarkerBuffer.saveMarkerBuffer( self.markerBuffer, filename )
     
     #---------------------------------------------------------------------------
     def onMenuItemSaveActivate( self, widget ):
