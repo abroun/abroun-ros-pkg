@@ -67,7 +67,8 @@ class MainWindow:
     COMBINATION_METHOD = "NoChange"
     
     #GROUND_TRUTH_FILENAME = "/../../config/TopPosGripper.yaml"
-    GROUND_TRUTH_FILENAME = "/../../config/ExperimentPosGripper.yaml"
+    #GROUND_TRUTH_FILENAME = "/../../config/ExperimentPosGripper.yaml"
+    GROUND_TRUTH_FILENAME = "/../../config/OnTablePosGripper.yaml"
     
     CORRELATION_THRESHOLD = 0.63
     MAX_TEST_POINT_X = (320 - OPTICAL_FLOW_BLOCK_WIDTH)/OPTICAL_FLOW_BLOCK_WIDTH - 1
@@ -92,7 +93,7 @@ class MainWindow:
         t1 = time.time()
         
         self.inputSequence = InputSequence( bagFilename )
-        self.inputSequence.addDistractorObjects( 4 )
+        #self.inputSequence.addDistractorObjects( 4 )
         self.inputSequence.calculateOpticalFlow(
             self.OPTICAL_FLOW_BLOCK_WIDTH, self.OPTICAL_FLOW_BLOCK_HEIGHT,
             self.OPTICAL_FLOW_RANGE_WIDTH, self.OPTICAL_FLOW_RANGE_HEIGHT,
@@ -233,6 +234,9 @@ class MainWindow:
         self.axisY.clear()
         self.axisY.plot( regSeq.regularSampleTimes, normalisedServoAngleData )
         self.axisY.plot( regSeq.regularSampleTimes, normalisedOpticalFlowDataY )
+        
+        inpSeq = self.inputSequence
+        self.axisY.plot( inpSeq.imageTimes, Utils.normaliseSequence( inpSeq.opticalFlowArraysY[ testY ][ testX ] ) )
         
         if numCorrelationChannels >= 2:
             correlationChannel = corSeq.correlationChannels[ 1 ][ testY ][ testX ]

@@ -31,29 +31,30 @@ class InputSequence:
         
         # Extract messages from the bag
         startTime = None
-        lastAngleTime = None
-        lastCameraTime = None
+        lastAngleTime = -1.0
+        lastCameraTime = -1.0
         
         for topic, msg, t in rosrecord.logplayer( bagFilename ):
             if startTime == None:
                 startTime = t
                 
             bagTime = t - startTime
+            bagTimeSec = bagTime.to_sec()
                 
             if msg._type == "arm_driver_msgs/SetServoAngles" \
-                and bagTime != lastAngleTime:
+                and bagTimeSec - lastAngleTime > 0.01:
                 
-                lastAngleTime = bagTime
-                self.servoAngleTimes.append( bagTime.to_sec() )
+                lastAngleTime = bagTimeSec
+                self.servoAngleTimes.append( bagTimeSec )
                 
                 servoAngle = msg.servoAngles[ 0 ].angle
                 self.servoAngleData.append( servoAngle )
                 
             elif msg._type == "sensor_msgs/Image" \
-                and bagTime != lastCameraTime:
+                and bagTimeSec - lastCameraTime > 0.01:
 
-                lastCameraTime = bagTime
-                self.imageTimes.append( bagTime.to_sec() )
+                lastCameraTime = bagTimeSec
+                self.imageTimes.append( bagTimeSec )
                 
                 # Convert the image to a numpy array
                 if msg.encoding == "rgb8" or msg.encoding == "bgr8":

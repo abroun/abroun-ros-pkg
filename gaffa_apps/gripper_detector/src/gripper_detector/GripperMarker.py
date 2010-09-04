@@ -219,6 +219,7 @@ class MainWindow:
                 and markerX >= 0 and markerX < self.markerBuffer.shape[ 1 ]:
                     
                 self.markerBuffer[ markerY, markerX ] = on
+                self.dwgCameraImage.queue_draw()
     
     #---------------------------------------------------------------------------
     def onDwgCameraImageButtonPressEvent( self, widget, data ):

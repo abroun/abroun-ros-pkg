@@ -3,6 +3,7 @@ import math
 import numpy as np
 import scipy.signal
 import scipy.interpolate
+import scipy.ndimage
 
 #-------------------------------------------------------------------------------
 def crossCorrelateComplete( sequence, laggedSequence, maxLag = None ):
@@ -73,4 +74,6 @@ def resampleSequence( sequenceData, sequenceTimes, newSequenceTimes ):
     tck = scipy.interpolate.splrep( sequenceTimes, sequenceData )
 
     # Evaluate spline at new sample points
-    return scipy.interpolate.splev( newSequenceTimes,tck )
+    #return scipy.interpolate.splev( newSequenceTimes,tck )
+    return scipy.ndimage.gaussian_filter1d( scipy.interpolate.splev( newSequenceTimes,tck ), 5.0 )
+    
