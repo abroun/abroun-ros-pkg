@@ -74,6 +74,6 @@ def resampleSequence( sequenceData, sequenceTimes, newSequenceTimes ):
     tck = scipy.interpolate.splrep( sequenceTimes, sequenceData )
 
     # Evaluate spline at new sample points
-    #return scipy.interpolate.splev( newSequenceTimes,tck )
-    return scipy.ndimage.gaussian_filter1d( scipy.interpolate.splev( newSequenceTimes,tck ), 5.0 )
+    return scipy.interpolate.splev( newSequenceTimes,tck )
+    #return scipy.ndimage.gaussian_filter1d( scipy.interpolate.splev( newSequenceTimes,tck ), 5.0 )
     
