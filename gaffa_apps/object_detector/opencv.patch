@@ -1,0 +1,54 @@
+Index: modules/python/api
+===================================================================
+--- modules/python/api	(revision 3119)
++++ modules/python/api	(working copy)
+@@ -956,6 +956,14 @@
+   double threshold
+   double maxValue
+   int thresholdType
++GrabCut
++  CvArr image
++  CvArr mask
++  CvRect rect
++  CvArr bgdModel
++  CvArr fgdModel
++  int iterCount
++  int mode
+ AdaptiveThreshold
+   CvArr src
+   CvArr dst
+Index: modules/imgproc/include/opencv2/imgproc/imgproc_c.h
+===================================================================
+--- modules/imgproc/include/opencv2/imgproc/imgproc_c.h	(revision 3119)
++++ modules/imgproc/include/opencv2/imgproc/imgproc_c.h	(working copy)
+@@ -633,6 +633,11 @@
+                             double  threshold, double  max_value,
+                             int threshold_type );
+ 
++CVAPI(void)  cvGrabCut( const CvArr*  image, CvArr*  mask,
++                        CvRect  rect,
++                        CvArr*  bgdModel, CvArr*  fgdModel,
++                        int iterCount, int model );
++
+ /* Applies adaptive threshold to grayscale image.
+    The two parameters for methods CV_ADAPTIVE_THRESH_MEAN_C and
+    CV_ADAPTIVE_THRESH_GAUSSIAN_C are:
+Index: modules/imgproc/src/grabcut.cpp
+===================================================================
+--- modules/imgproc/src/grabcut.cpp	(revision 3119)
++++ modules/imgproc/src/grabcut.cpp	(working copy)
+@@ -557,3 +557,14 @@
+         estimateSegmentation( graph, mask );
+     }
+ }
++
++CV_IMPL void
++cvGrabCut( const void* imgarr, void* maskarr, CvRect rect, void* bgdModelArr, void* fgdModelArr, int iterCount, int mode )
++{
++    cv::Mat img = cv::cvarrToMat(imgarr);
++    cv::Mat mask = cv::cvarrToMat(maskarr);
++    cv::Mat bgdModel = cv::cvarrToMat(bgdModelArr);
++    cv::Mat fgdModel = cv::cvarrToMat(fgdModelArr);
++
++    cv::grabCut( img, mask, rect, bgdModel, fgdModel, iterCount, mode );
++}

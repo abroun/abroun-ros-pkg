@@ -105,14 +105,15 @@
               <object class="GtkVBox" id="vbox4">
                 <property name="visible">True</property>
                 <child>
-                  <object class="GtkButton" id="btnClear">
-                    <property name="label" translatable="yes">Clear</property>
+                  <object class="GtkButton" id="btnClearMask">
+                    <property name="label" translatable="yes">Clear Mask</property>
                     <property name="visible">True</property>
                     <property name="can_focus">True</property>
                     <property name="receives_default">True</property>
-                    <signal name="clicked" handler="onBtnClearClicked"/>
+                    <signal name="clicked" handler="onBtnClearMaskClicked"/>
                   </object>
                   <packing>
+                    <property name="expand">False</property>
                     <property name="position">0</property>
                   </packing>
                 </child>
@@ -147,6 +148,7 @@
                     </child>
                   </object>
                   <packing>
+                    <property name="expand">False</property>
                     <property name="position">1</property>
                   </packing>
                 </child>
@@ -175,6 +177,7 @@
                     </child>
                   </object>
                   <packing>
+                    <property name="expand">False</property>
                     <property name="position">2</property>
                   </packing>
                 </child>
@@ -187,6 +190,7 @@
                     <signal name="clicked" handler="onBtnSegmentClicked"/>
                   </object>
                   <packing>
+                    <property name="expand">False</property>
                     <property name="position">3</property>
                   </packing>
                 </child>
