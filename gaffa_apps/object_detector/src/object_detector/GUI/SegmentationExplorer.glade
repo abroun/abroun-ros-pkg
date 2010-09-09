@@ -90,7 +90,10 @@
                 <child>
                   <object class="GtkDrawingArea" id="dwgImage">
                     <property name="visible">True</property>
+                    <property name="events">GDK_BUTTON1_MOTION_MASK | GDK_BUTTON_PRESS_MASK | GDK_STRUCTURE_MASK</property>
                     <signal name="expose_event" handler="onDwgImageExposeEvent"/>
+                    <signal name="button_press_event" handler="onDwgImageButtonPressEvent"/>
+                    <signal name="motion_notify_event" handler="onDwgImageMotionNotifyEvent"/>
                   </object>
                   <packing>
                     <property name="position">1</property>
@@ -153,6 +156,40 @@
                   </packing>
                 </child>
                 <child>
+                  <object class="GtkHBox" id="hbox4">
+                    <property name="visible">True</property>
+                    <child>
+                      <object class="GtkLabel" id="label5">
+                        <property name="visible">True</property>
+                        <property name="label" translatable="yes">Pixel Class:</property>
+                      </object>
+                      <packing>
+                        <property name="position">0</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkComboBox" id="comboPixelClass">
+                        <property name="visible">True</property>
+                        <property name="model">listPixelType</property>
+                        <property name="active">0</property>
+                        <child>
+                          <object class="GtkCellRendererText" id="cellrenderertext1"/>
+                          <attributes>
+                            <attribute name="text">0</attribute>
+                          </attributes>
+                        </child>
+                      </object>
+                      <packing>
+                        <property name="position">1</property>
+                      </packing>
+                    </child>
+                  </object>
+                  <packing>
+                    <property name="expand">False</property>
+                    <property name="position">2</property>
+                  </packing>
+                </child>
+                <child>
                   <object class="GtkHBox" id="hbox2">
                     <property name="visible">True</property>
                     <child>
@@ -178,7 +215,7 @@
                   </object>
                   <packing>
                     <property name="expand">False</property>
-                    <property name="position">2</property>
+                    <property name="position">3</property>
                   </packing>
                 </child>
                 <child>
@@ -191,7 +228,7 @@
                   </object>
                   <packing>
                     <property name="expand">False</property>
-                    <property name="position">3</property>
+                    <property name="position">4</property>
                   </packing>
                 </child>
               </object>
@@ -239,6 +276,7 @@
     <property name="upper">100</property>
     <property name="step_increment">1</property>
     <property name="page_increment">10</property>
+    <signal name="value_changed" handler="onAdjBrushSizeValueChanged"/>
   </object>
   <object class="GtkListStore" id="listBrushType">
     <columns>
@@ -251,6 +289,20 @@
       </row>
       <row>
         <col id="0" translatable="yes">Circle</col>
+      </row>
+    </data>
+  </object>
+  <object class="GtkListStore" id="listPixelType">
+    <columns>
+      <!-- column-name Type -->
+      <column type="gchararray"/>
+    </columns>
+    <data>
+      <row>
+        <col id="0" translatable="yes">Foreground</col>
+      </row>
+      <row>
+        <col id="0" translatable="yes">Background</col>
       </row>
     </data>
   </object>

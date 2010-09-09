@@ -1,0 +1,4 @@
+Apply opencv.patch using the following commands
+
+roscd opencv2/build/opencv-svn
+patch -p0 -i ~/abroun-ros-pkg/gaffa_apps/object_detector/opencv.patch

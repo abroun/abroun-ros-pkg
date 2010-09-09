@@ -125,7 +125,19 @@ class Display:
 #-------------------------------------------------------------------------------
 class MainWindow:
     
-    BRUSH_COLOUR = np.array( [ 255, 255, 0 ], dtype=np.uint8 )
+    FOREGROUND_BRUSH_COLOUR = np.array( [ 255, 255, 0 ], dtype=np.uint8 )
+    BACKGROUND_BRUSH_COLOUR = np.array( [ 0, 0, 255 ], dtype=np.uint8 )
+    
+    # Classes of pixel in GrabCut algorithm
+    GC_BGD = 0      # background
+    GC_FGD = 1      # foreground
+    GC_PR_BGD = 2   # most probably background
+    GC_PR_FGD = 3   # most probably foreground 
+
+    # GrabCut algorithm flags
+    GC_INIT_WITH_RECT = 0
+    GC_INIT_WITH_MASK = 1
+    GC_EVAL = 2
  
     #---------------------------------------------------------------------------
     def __init__( self ):
@@ -144,6 +156,7 @@ class MainWindow:
         dwgSegmentation = builder.get_object( "dwgSegmentation" )
         self.adjBrushSize = builder.get_object( "adjBrushSize" )
         self.comboBrushType = builder.get_object( "comboBrushType" )
+        self.comboPixelClass = builder.get_object( "comboPixelClass" )
         
         self.dwgImageDisplay = Display( dwgImage )
         self.dwgSegmentationDisplay = Display( dwgSegmentation )
@@ -173,8 +186,47 @@ class MainWindow:
     def makeBrush( self ):
         
         brushSize = self.adjBrushSize.get_value()
-        brushShape = ( brushSize, brushSize, 3 )
-        #self.brush
+        brushShape = ( brushSize, brushSize )
+        self.brush = np.zeros( brushSize, dtype=np.uint8 )
+        self.brush.fill( self.GC_FGD )
+        
+        brushRadius = int( brushSize / 2 )
+        self.brushIndices = np.indices( brushShape ) - brushRadius
+        brushType = self.comboBrushType.get_active_text()
+        if brushType == "Circle":
+            i = self.brushIndices
+            circleIndices = np.where( i[0]*i[0] + i[1]*i[1] <= brushRadius*brushRadius )
+            self.brushIndices = self.brushIndices[ :, circleIndices[ 0 ], circleIndices[ 1 ] ]
+            
+    #---------------------------------------------------------------------------
+    def alterMask( self, x, y, pixelClass ):
+        
+        if self.maskArray != None:
+            
+            indices = np.copy( self.brushIndices )
+            indices[ 0 ] += y
+            indices[ 1 ] += x
+            
+            validIndices = indices[ :, 
+                np.where( (indices[ 0 ]>=0) & (indices[ 1 ]>=0) \
+                    & (indices[ 0 ] < self.maskArray.shape[ 0 ]) \
+                    & (indices[ 1 ] < self.maskArray.shape[ 1 ]) ) ]
+            self.maskArray[ validIndices[ 0 ], validIndices[ 1 ] ] = pixelClass
+             
+            self.composedImage = np.copy( self.image )
+            self.composedImage[ self.maskArray == self.GC_FGD ] = self.FOREGROUND_BRUSH_COLOUR
+            self.composedImage[ self.maskArray == self.GC_BGD ] = self.BACKGROUND_BRUSH_COLOUR
+            
+            self.dwgImageDisplay.setImageFromNumpyArray( self.composedImage )
+            
+    #---------------------------------------------------------------------------
+    def getCurPixelClass( self ):
+        
+        pixelClassText = self.comboPixelClass.get_active_text()
+        if pixelClassText == "Background":
+            return self.GC_BGD
+        else:
+            return self.GC_FGD
         
     #---------------------------------------------------------------------------
     def chooseImageFile( self ):
@@ -216,47 +268,11 @@ class MainWindow:
             cv.CvtColor( self.image, self.image, cv.CV_BGR2RGB )
             
             # Create a mask and blank segmentation that matches the size of the image
-            self.maskArray = np.zeros( ( self.image.height, self.image.width, 3 ), np.uint8 )
+            self.maskArray = np.ones( ( self.image.height, self.image.width ), np.uint8 )*self.GC_PR_BGD
             self.segmentation = np.zeros( ( self.image.height, self.image.width, 3 ), np.uint8 )
             
-            GC_INIT_WITH_RECT = 0
-            
-            otherMask = cv.CreateMat( self.image.height, self.image.width, cv.CV_8UC1 )
-            cv.SetZero( otherMask )
-            fgModel = cv.CreateMat( 1, 5*13, cv.CV_32FC1 )
-            bgModel = cv.CreateMat( 1, 5*13, cv.CV_32FC1 )
-            
-            cv.GrabCut( self.image, otherMask, (192,125,120,190), fgModel, bgModel, 4, GC_INIT_WITH_RECT )
-            
-            npOtherMask = np.array( otherMask )
-            self.segmentation[ :, :, 0 ] = otherMask
-            self.segmentation[ :, :, 1 ] = otherMask
-            self.segmentation[ :, :, 2 ] = otherMask
-            #print self.segmentation[ self.segmentation != 0 ].shape
-            #self.segmentation[ self.segmentation == 3 ] = 255
-            segmentedImage = np.copy( self.image )
-            segmentedImage[ self.segmentation != 3 ] = 0
-            
             self.dwgImageDisplay.setImageFromOpenCVMatrix( self.image )
-            self.dwgSegmentationDisplay.setImageFromNumpyArray( segmentedImage )
-        
-            #markerBuffer = MarkerBuffer.loadMarkerBuffer( filename )
-            #if markerBuffer != None:
-            
-                #blockWidth = self.lastImage.width / (markerBuffer.shape[ 1 ] + 1)
-                #blockHeight = self.lastImage.height / (markerBuffer.shape[ 0 ] + 1)
-                    
-                #if blockHeight < self.adjBlockHeight.get_upper() \
-                    #and blockWidth < self.adjBlockWidth.get_upper():
-                    
-                    #self.adjBlockWidth.set_value( blockWidth )
-                    #self.adjBlockHeight.set_value( blockHeight )
-                    #self.markerBuffer = markerBuffer
-                        
-                    ## Successful so remember filename
-                    #self.filename = filename
-                #else:
-                    #print "Error: Invalid block width or height, please fix with Glade"            
+            self.dwgSegmentationDisplay.setImageFromNumpyArray( self.segmentation )            
     
     #---------------------------------------------------------------------------
     def onMenuItemQuitActivate( self, widget ):
@@ -265,29 +281,55 @@ class MainWindow:
     #---------------------------------------------------------------------------
     def onBtnClearMaskClicked( self, widget ):
         if self.image != None:
-            self.maskArray = np.zeros( ( self.image.height, self.image.width, 3 ), np.uint8 )
-            self.dwgImageDisplay.queueDraw()
+            self.maskArray = np.ones( ( self.image.height, self.image.width ), np.uint8 )*self.GC_PR_BGD
+            self.dwgImageDisplay.setImageFromOpenCVMatrix( self.image )
     
     #---------------------------------------------------------------------------
     def onBtnSegmentClicked( self, widget ):
-        pass
-    
+        
+        if self.maskArray != None:
+            workingMask = np.copy( self.maskArray )
+            
+            fgModel = cv.CreateMat( 1, 5*13, cv.CV_32FC1 )
+            bgModel = cv.CreateMat( 1, 5*13, cv.CV_32FC1 )
+            
+            cv.GrabCut( self.image, workingMask, 
+                (0,0,0,0), fgModel, bgModel, 4, self.GC_INIT_WITH_MASK )
+            
+            self.segmentation = np.copy( self.image )
+            self.segmentation[ (workingMask != self.GC_PR_FGD) & (workingMask != self.GC_FGD) ] = 0
+            self.dwgSegmentationDisplay.setImageFromNumpyArray( self.segmentation )
+            
     #---------------------------------------------------------------------------
     def onComboBrushTypeChanged( self, widget ):
-        print self.comboBrushType.get_active_text()
+        self.makeBrush()
+        
+    #---------------------------------------------------------------------------
+    def onAdjBrushSizeValueChanged( self, widget ):
+        self.makeBrush()
     
     #---------------------------------------------------------------------------
     def onDwgImageButtonPressEvent( self, widget, data ):
         
         if data.button == 1:
-            self.setMarker( widget, data, True )
+            self.onImageMaskChanged( widget, data, self.getCurPixelClass() )
         else:
-            self.setMarker( widget, data, False )
+            self.onImageMaskChanged( widget, data, self.GC_PR_BGD )
             
     #---------------------------------------------------------------------------
     def onDwgImageMotionNotifyEvent( self, widget, data ):
         
-        self.setMarker( widget, data, True )
+        self.onImageMaskChanged( widget, data, self.getCurPixelClass() )
+        
+    #---------------------------------------------------------------------------
+    def onImageMaskChanged( self, widget, data, pixelClass ):
+        
+        imgRect = self.dwgImageDisplay.getImageRectangleInWidget( widget )
+        if imgRect != None:
+        
+            x = data.x - imgRect.x
+            y = data.y - imgRect.y
+            self.alterMask( x, y, pixelClass )
     
     #---------------------------------------------------------------------------
     def onDwgImageExposeEvent( self, widget, data ):
@@ -297,6 +339,16 @@ class MainWindow:
         if imgRect != None:
             
             imgRect = imgRect.intersect( data.area )
+            
+            # Add in the mask
+            #if self.maskArray != None:
+                #self.maskArrayRGB.fill( 0 )
+                #self.maskArrayRGB[ self.maskArray == self.GC_FGD ] = self.FOREGROUND_BRUSH_COLOUR
+                
+                #self.drawingArea.window.draw_pixbuf( 
+                    #self.drawingArea.get_style().fg_gc[ gtk.STATE_NORMAL ],
+                    #self.pixBuf, srcX, srcY, 
+                    #redrawRect.x, redrawRect.y, redrawRect.width, redrawRect.height )
               
             # Draw an overlay to show the selected segmentation
             #if self.markerBuffer != None:
