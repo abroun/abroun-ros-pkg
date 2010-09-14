@@ -68,7 +68,8 @@ class MainWindow:
     
     #GROUND_TRUTH_FILENAME = "/../../config/TopPosGripper.yaml"
     #GROUND_TRUTH_FILENAME = "/../../config/ExperimentPosGripper.yaml"
-    GROUND_TRUTH_FILENAME = "/../../config/OnTablePosGripper.yaml"
+    #GROUND_TRUTH_FILENAME = "/../../config/OnTablePosGripper.yaml"
+    GROUND_TRUTH_FILENAME = "/../../config/BasicWave_Gripper.yaml"
     
     CORRELATION_THRESHOLD = 0.63
     MAX_TEST_POINT_X = (320 - OPTICAL_FLOW_BLOCK_WIDTH)/OPTICAL_FLOW_BLOCK_WIDTH - 1
