@@ -54,7 +54,7 @@ class MainWindow:
         self.filename = None
             
         # Load up the video
-        self.videoCapture = cv.CaptureFromFile( self.scriptPath + "/../../test_data/video/MVI_0028.AVI" )
+        self.videoCapture = cv.CaptureFromFile( self.scriptPath + "/../../test_data/bags/tissues.avi" )
         
         cv.SetCaptureProperty( self.videoCapture, cv.CV_CAP_PROP_POS_FRAMES, 0 )    
         self.pixelModelBuffer = None

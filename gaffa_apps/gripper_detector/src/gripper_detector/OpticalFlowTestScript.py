@@ -87,6 +87,11 @@ print "Building ROC Curve"
 markerBuffer = MarkerBuffer.loadMarkerBuffer( markerFilename )
 if markerBuffer == None:
     print "Error: Unable to load marker buffer -", markerFilename
+    
+# Average results
+
+# Plot ROC Curve
+# Plot accuracy
         
 rocCurve = ROCCurve( crossCorrelatedSequence, markerBuffer )
  

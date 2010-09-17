@@ -109,119 +109,119 @@ class MainWindow:
             self.opticalFlowBufferY[ :, :, self.curSampleIdx ] = self.opticalFlowY
             self.curSampleIdx = (self.curSampleIdx + 1)%self.numBufferSamples
             
-            #t1 = time.time()
+            t1 = time.time()
             
-            ## Check for correlated movement in the X direction
-            #groups = np.multiply( np.ones( 
-                #shape=(self.opticalFlowBufferX.shape[0],self.opticalFlowBufferX.shape[1]), 
-                #dtype=np.int32 ), -1 )
+            # Check for correlated movement in the X direction
+            groups = np.multiply( np.ones( 
+                shape=(self.opticalFlowBufferX.shape[0],self.opticalFlowBufferX.shape[1]), 
+                dtype=np.int32 ), -1 )
                 
-            #NO_MOVEMENT_GROUP = 0
-            #nextGroupIdx = 1
-            #numBlocks = self.opticalFlowBufferX.shape[0]*self.opticalFlowBufferX.shape[1]
+            NO_MOVEMENT_GROUP = 0
+            nextGroupIdx = 1
+            numBlocks = self.opticalFlowBufferX.shape[0]*self.opticalFlowBufferX.shape[1]
             
-            #numSamples = self.opticalFlowBufferX.shape[ 2 ]
-            #squareSumArray = np.add.reduce( np.square( self.opticalFlowBufferX ), axis=2 )
-            #sumArray = np.add.reduce( self.opticalFlowBufferX, axis=2 )
-            #meanArray = np.divide( sumArray, numSamples )
-            #varArray = np.subtract( 
-                #np.divide( squareSumArray, numSamples ),
-                #np.square( meanArray ) )
+            numSamples = self.opticalFlowBufferX.shape[ 2 ]
+            squareSumArray = np.add.reduce( np.square( self.opticalFlowBufferX ), axis=2 )
+            sumArray = np.add.reduce( self.opticalFlowBufferX, axis=2 )
+            meanArray = np.divide( sumArray, numSamples )
+            varArray = np.subtract( 
+                np.divide( squareSumArray, numSamples ),
+                np.square( meanArray ) )
             
-            ##print np.max( varArray )
-            ##print self.opticalFlowBufferX[ varArray > 15.0 ]
-            #for blockIdx in range( numBlocks ):
+            #print np.max( varArray )
+            #print self.opticalFlowBufferX[ varArray > 15.0 ]
+            for blockIdx in range( numBlocks ):
                 
-                #rowIdx = int( blockIdx / self.opticalFlowBufferX.shape[1] )
-                #colIdx = blockIdx%self.opticalFlowBufferX.shape[1]
+                rowIdx = int( blockIdx / self.opticalFlowBufferX.shape[1] )
+                colIdx = blockIdx%self.opticalFlowBufferX.shape[1]
                     
-                #if groups[ rowIdx, colIdx ] == -1:
+                if groups[ rowIdx, colIdx ] == -1:
                     
                     
-                    #flow = self.opticalFlowBufferX[ rowIdx, colIdx, : ]
+                    flow = self.opticalFlowBufferX[ rowIdx, colIdx, : ]
                     
-                    ##mean = np.sum( flow )/len( flow )
-                    #var = varArray[ rowIdx, colIdx ]
+                    #mean = np.sum( flow )/len( flow )
+                    var = varArray[ rowIdx, colIdx ]
                     
-                    #if var < 10.0:
-                        #groups[ rowIdx, colIdx ] = NO_MOVEMENT_GROUP
-                    #else:  
-                        #curGroupIdx = nextGroupIdx
-                        #groups[ rowIdx, colIdx ] = curGroupIdx
-                        #nextGroupIdx += 1
+                    if var < 10.0:
+                        groups[ rowIdx, colIdx ] = NO_MOVEMENT_GROUP
+                    else:  
+                        curGroupIdx = nextGroupIdx
+                        groups[ rowIdx, colIdx ] = curGroupIdx
+                        nextGroupIdx += 1
                         
-                        #mulArray = np.add.reduce( np.multiply( self.opticalFlowBufferX, flow ), axis=2 )
+                        mulArray = np.add.reduce( np.multiply( self.opticalFlowBufferX, flow ), axis=2 )
 
-                        #corCoeffArray = np.subtract( 
-                            #np.divide( mulArray, numSamples ), np.multiply( meanArray, meanArray[ rowIdx, colIdx ] ) ) 
-                        #corCoeffArray = np.divide( corCoeffArray,
-                            #np.sqrt( np.multiply( varArray, var ) ) )
+                        corCoeffArray = np.subtract( 
+                            np.divide( mulArray, numSamples ), np.multiply( meanArray, meanArray[ rowIdx, colIdx ] ) ) 
+                        corCoeffArray = np.divide( corCoeffArray,
+                            np.sqrt( np.multiply( varArray, var ) ) )
 
-                        #absCoeff = np.abs( corCoeffArray )
-                        #groups[ np.logical_and( varArray > 10.0, 
-                            #np.logical_and( corCoeffArray > 0.01, groups == -1 ) ) ] = curGroupIdx
+                        absCoeff = np.abs( corCoeffArray )
+                        groups[ np.logical_and( varArray > 10.0, 
+                            np.logical_and( corCoeffArray > 0.01, groups == -1 ) ) ] = curGroupIdx
 
-                        ## Find all blocks with correlated movement
-                        ##for otherBlockIdx in range( blockIdx + 1, numBlocks ):
-                            ##otherRowIdx = int( otherBlockIdx / self.opticalFlowBufferX.shape[1] )
-                            ##otherColIdx = otherBlockIdx%self.opticalFlowBufferX.shape[1]
+                        # Find all blocks with correlated movement
+                        #for otherBlockIdx in range( blockIdx + 1, numBlocks ):
+                            #otherRowIdx = int( otherBlockIdx / self.opticalFlowBufferX.shape[1] )
+                            #otherColIdx = otherBlockIdx%self.opticalFlowBufferX.shape[1]
                             
-                            ### Only look at blocks which aren't already part of a group
-                            ##if groups[ otherRowIdx, otherColIdx ] == -1:
+                            ## Only look at blocks which aren't already part of a group
+                            #if groups[ otherRowIdx, otherColIdx ] == -1:
                                 
-                                ##if corCoeffArray[ otherRowIdx, otherColIdx ] > 0.95:
-                                    ##groups[ otherRowIdx, otherColIdx ] = curGroupIdx
-                                ##otherFlow = self.opticalFlowBufferX[ otherRowIdx, otherColIdx, : ]
-                                ##if np.corrcoef( flow, otherFlow )[ 0, 1 ] > 0.95:
-                                    ##groups[ otherRowIdx, otherColIdx ] = curGroupIdx
+                                #if corCoeffArray[ otherRowIdx, otherColIdx ] > 0.95:
+                                    #groups[ otherRowIdx, otherColIdx ] = curGroupIdx
+                                #otherFlow = self.opticalFlowBufferX[ otherRowIdx, otherColIdx, : ]
+                                #if np.corrcoef( flow, otherFlow )[ 0, 1 ] > 0.95:
+                                    #groups[ otherRowIdx, otherColIdx ] = curGroupIdx
               
-            #t2 = time.time()
-            #print "FindCorr", t2 - t1
+            t2 = time.time()
+            print "FindCorr", t2 - t1
               
-            #def colourBlock( width, height, r, g, b ):
-                #block = np.tile( np.array( [ r, g, b ], dtype=np.uint8 ), ( width, height ) )
-                #block.shape = ( width, height, 3 )
-                #return block
+            def colourBlock( width, height, r, g, b ):
+                block = np.tile( np.array( [ r, g, b ], dtype=np.uint8 ), ( width, height ) )
+                block.shape = ( width, height, 3 )
+                return block
             
-            #t1 = time.time()
+            t1 = time.time()
               
-            ## Now translate groups back into an image
-            #availableColours = [
-                #colourBlock( self.OPTICAL_FLOW_BLOCK_WIDTH, self.OPTICAL_FLOW_BLOCK_HEIGHT, 255, 0, 0 ),
-                #colourBlock( self.OPTICAL_FLOW_BLOCK_WIDTH, self.OPTICAL_FLOW_BLOCK_HEIGHT, 0, 255, 0 ),
-                #colourBlock( self.OPTICAL_FLOW_BLOCK_WIDTH, self.OPTICAL_FLOW_BLOCK_HEIGHT, 0, 0, 255 ) ]
-            #BLACK = colourBlock( self.OPTICAL_FLOW_BLOCK_WIDTH, self.OPTICAL_FLOW_BLOCK_HEIGHT, 0, 0, 0 )
+            # Now translate groups back into an image
+            availableColours = [
+                colourBlock( self.OPTICAL_FLOW_BLOCK_WIDTH, self.OPTICAL_FLOW_BLOCK_HEIGHT, 255, 0, 0 ),
+                colourBlock( self.OPTICAL_FLOW_BLOCK_WIDTH, self.OPTICAL_FLOW_BLOCK_HEIGHT, 0, 255, 0 ),
+                colourBlock( self.OPTICAL_FLOW_BLOCK_WIDTH, self.OPTICAL_FLOW_BLOCK_HEIGHT, 0, 0, 255 ) ]
+            BLACK = colourBlock( self.OPTICAL_FLOW_BLOCK_WIDTH, self.OPTICAL_FLOW_BLOCK_HEIGHT, 0, 0, 0 )
             
             npImage = np.fromstring( rosImage.data, dtype=np.uint8 )
             npImage.shape = ( rosImage.height, rosImage.width, 3 )
             
-            #numGroups = nextGroupIdx
-            #groupColours = [ i - 1 for i in range( numGroups ) ]
-            #neededColours = numGroups - 1
-            #numAvailableColours = len( availableColours )
-            #if neededColours > numAvailableColours:
-                #print "Needed {0} extra colours".format( neededColours - numAvailableColours )
+            numGroups = nextGroupIdx
+            groupColours = [ i - 1 for i in range( numGroups ) ]
+            neededColours = numGroups - 1
+            numAvailableColours = len( availableColours )
+            if neededColours > numAvailableColours:
+                print "Needed {0} extra colours".format( neededColours - numAvailableColours )
             
-            #for rowIdx in range( self.opticalFlowBufferX.shape[0] ):
-                #for colIdx in range( self.opticalFlowBufferX.shape[1] ):
+            for rowIdx in range( self.opticalFlowBufferX.shape[0] ):
+                for colIdx in range( self.opticalFlowBufferX.shape[1] ):
                     
-                    #groupIdx = groups[ rowIdx, colIdx ]
-                    #if groupIdx > 0:
-                        #if groupIdx >= numGroups: #len( groupColours ):
-                            #print rowIdx, colIdx, numGroups, groupIdx
-                        #colourIdx = groupColours[ groupIdx ]
-                        #if colourIdx < numAvailableColours:
+                    groupIdx = groups[ rowIdx, colIdx ]
+                    if groupIdx > 0:
+                        if groupIdx >= numGroups: #len( groupColours ):
+                            print rowIdx, colIdx, numGroups, groupIdx
+                        colourIdx = groupColours[ groupIdx ]
+                        if colourIdx < numAvailableColours:
                     
-                            #leftX = colIdx*self.OPTICAL_FLOW_BLOCK_WIDTH
-                            #rightX = leftX + self.OPTICAL_FLOW_BLOCK_WIDTH
-                            #topY = rowIdx*self.OPTICAL_FLOW_BLOCK_HEIGHT
-                            #bottomY = topY + self.OPTICAL_FLOW_BLOCK_HEIGHT
+                            leftX = colIdx*self.OPTICAL_FLOW_BLOCK_WIDTH
+                            rightX = leftX + self.OPTICAL_FLOW_BLOCK_WIDTH
+                            topY = rowIdx*self.OPTICAL_FLOW_BLOCK_HEIGHT
+                            bottomY = topY + self.OPTICAL_FLOW_BLOCK_HEIGHT
                             
-                            ##print npImage[ topY:bottomY, leftX:rightX, : ].shape, availableColours[ colourIdx ].shape
-                            #npImage[ topY:bottomY, leftX:rightX, : ] = availableColours[ colourIdx ]
+                            #print npImage[ topY:bottomY, leftX:rightX, : ].shape, availableColours[ colourIdx ].shape
+                            npImage[ topY:bottomY, leftX:rightX, : ] = availableColours[ colourIdx ]
             
-            #t2 = time.time()
-            #print "Colour", t2 - t1
+            t2 = time.time()
+            print "Colour", t2 - t1
             
             
             
@@ -241,13 +241,13 @@ class MainWindow:
             #np.choose( label, np.array( centroid, dtype=np.uint8 ) )
             #print np.array( centroid, dtype=np.uint8 )
             
-            if self.npAcc == None:
-                self.npAcc = np.ndarray( shape=(10,npImage.shape[0],npImage.shape[1],npImage.shape[2]), dtype=np.uint8 )
-                self.accIdx = 0
+            #if self.npAcc == None:
+                #self.npAcc = np.ndarray( shape=(10,npImage.shape[0],npImage.shape[1],npImage.shape[2]), dtype=np.uint8 )
+                #self.accIdx = 0
                 
-            self.npAcc[ self.accIdx, :, :, : ] = npImage
-            self.accIdx = (self.accIdx + 1)%self.npAcc.shape[0]
-            npImage = np.array( np.divide( np.add.reduce( self.npAcc ), self.npAcc.shape[0] ), dtype=np.uint8 )
+            #self.npAcc[ self.accIdx, :, :, : ] = npImage
+            #self.accIdx = (self.accIdx + 1)%self.npAcc.shape[0]
+            #npImage = np.array( np.divide( np.add.reduce( self.npAcc ), self.npAcc.shape[0] ), dtype=np.uint8 )
             
             self.cameraImagePixBuf = gtk.gdk.pixbuf_new_from_data( 
                 npImage.tostring(), 
@@ -276,7 +276,7 @@ class MainWindow:
             # Optical flow has started so we have enough data to setup our buffers
             self.numBufferSamples = 5
             
-            opticalFlowBufferShape = ( self.opticalFlowX.height, self.opticalFlowX.width, self.numBufferSamples )
+            opticalFlowBufferShape = ( self.opticalFlowX.shape[0], self.opticalFlowX.shape[1], self.numBufferSamples )
             self.opticalFlowBufferX = np.zeros(shape=opticalFlowBufferShape, dtype=np.float32)
             self.opticalFlowBufferY = np.zeros(shape=opticalFlowBufferShape, dtype=np.float32)
         

@@ -32,7 +32,7 @@ class OpticalFlowFilter:
     #---------------------------------------------------------------------------
     def calcOpticalFlow( self, curImageGray, method="BlockMatching" ):
         
-        if curImageGray.channels != 1 or curImageGray.depth != 8:
+        if curImageGray.channels != 1:
             raise Exception( "Only able to process gray-scale images" )
         
         if self.lastImageGray == None:

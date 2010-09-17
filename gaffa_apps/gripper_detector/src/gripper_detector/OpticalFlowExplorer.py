@@ -39,7 +39,7 @@ import OpticalFlow.Utils as Utils
 from OpticalFlow.InputSequence import InputSequence
 from OpticalFlow.RegularisedInputSequence import RegularisedInputSequence
 from OpticalFlow.CrossCorrelatedSequence import CrossCorrelatedSequence
-from OpticalFlow.ROCCurve import ROCCurve
+from OpticalFlow.ROCCurve import ROCCurve, GripperDetectorROCCurve
 import OpticalFlow.MarkerBuffer as MarkerBuffer
 
 def printTiming(func):
@@ -160,7 +160,7 @@ class MainWindow:
         if markerBuffer == None:
             raise Exception( "Unable to load marker buffer" )
         
-        self.rocCurve = ROCCurve( self.crossCorrelatedSequence, markerBuffer )
+        self.rocCurve = GripperDetectorROCCurve( self.crossCorrelatedSequence, markerBuffer )
         
         # Create the matplotlib graph
         self.figure = Figure( figsize=(8,6), dpi=72 )
