@@ -20,12 +20,13 @@ import cv
 import matplotlib
 from matplotlib.figure import Figure
 from matplotlib.axes import Subplot
+from matplotlib.backends.backend_gtkagg import FigureCanvasGTKAgg as FigureCanvas
 
 import OpticalFlow.Utils as Utils
 from OpticalFlow.InputSequence import InputSequence
 from OpticalFlow.RegularisedInputSequence import RegularisedInputSequence
 from OpticalFlow.CrossCorrelatedSequence import CrossCorrelatedSequence
-from OpticalFlow.ROCCurve import ROCCurve
+from OpticalFlow.ROCCurve import ROCCurve, GripperDetectorROCCurve
 import OpticalFlow.MarkerBuffer as MarkerBuffer
 
 
@@ -49,9 +50,23 @@ MAX_TEST_POINT_Y = (240 - OPTICAL_FLOW_BLOCK_HEIGHT)/OPTICAL_FLOW_BLOCK_HEIGHT -
 
 SAMPLES_PER_SECOND = 30.0
 MAX_CORRELATION_LAG = 1.0
+NUM_ERROR_BARS = 10
 
 #-------------------------------------------------------------------------------
-usage = "usage: %prog [options] bagFile maskFile"
+class WorkingData:
+    
+    #---------------------------------------------------------------------------
+    def __init__( self, bagFilename, inputSequence, 
+        regularisedInputSequence, crossCorrelatedSequence, rocCurve ):
+            
+        self.bagFilename = bagFilename
+        self.inputSequence = inputSequence
+        self.regularisedInputSequence = regularisedInputSequence
+        self.crossCorrelatedSequence = crossCorrelatedSequence
+        self.rocCurve = rocCurve
+
+#-------------------------------------------------------------------------------
+usage = "usage: %prog [options] maskFile bagFiles"
 parser = OptionParser( usage=usage )
 #parser.add_option( "-o", "--output", dest="outputFilename", default="out.bag",
 #                  help="Write output to file", metavar="FILE")
@@ -63,37 +78,91 @@ if len( args ) < 2:
     parser.print_help()
     sys.exit( -1 )
     
-bagFilename = args[ 0 ]
-markerFilename = args[ 1 ]
+markerFilename = args[ 0 ]
+bagFilenames = args[ 1: ]
 
-print "Reading in bag file"
-inputSequence = InputSequence( bagFilename )
-#inputSequence.addDistractorObjects( 4 )
-inputSequence.calculateOpticalFlow(
-    OPTICAL_FLOW_BLOCK_WIDTH, OPTICAL_FLOW_BLOCK_HEIGHT,
-    OPTICAL_FLOW_RANGE_WIDTH, OPTICAL_FLOW_RANGE_HEIGHT,
-    OPTICAL_FLOW_METHOD )
-
-print "Resampling data"
-regularisedInputSequence = RegularisedInputSequence( 
-    inputSequence, SAMPLES_PER_SECOND )
-
-print "Performing cross correlation"
-crossCorrelatedSequence = CrossCorrelatedSequence( 
-    regularisedInputSequence, 
-    MAX_CORRELATION_LAG, COMBINATION_METHOD )
-    
-print "Building ROC Curve"
+# Load in marker buffer for evaluating classifier
 markerBuffer = MarkerBuffer.loadMarkerBuffer( markerFilename )
 if markerBuffer == None:
     print "Error: Unable to load marker buffer -", markerFilename
-    
-# Average results
 
-# Plot ROC Curve
-# Plot accuracy
+# Process each bag file in turn
+dataList = []
+for bagFilename in bagFilenames:
+    print "Reading in bag file"
+    inputSequence = InputSequence( bagFilename )
+    #inputSequence.addDistractorObjects( 4 )
+    inputSequence.calculateOpticalFlow(
+        OPTICAL_FLOW_BLOCK_WIDTH, OPTICAL_FLOW_BLOCK_HEIGHT,
+        OPTICAL_FLOW_RANGE_WIDTH, OPTICAL_FLOW_RANGE_HEIGHT,
+        OPTICAL_FLOW_METHOD )
+
+    print "Resampling data"
+    regularisedInputSequence = RegularisedInputSequence( 
+        inputSequence, SAMPLES_PER_SECOND )
+
+    print "Performing cross correlation"
+    crossCorrelatedSequence = CrossCorrelatedSequence( 
+        regularisedInputSequence, 
+        MAX_CORRELATION_LAG, COMBINATION_METHOD )
         
-rocCurve = ROCCurve( crossCorrelatedSequence, markerBuffer )
+    print "Building ROC Curve"
+    rocCurve = GripperDetectorROCCurve( crossCorrelatedSequence, markerBuffer )
+    
+    dataList.append( WorkingData( bagFilename, inputSequence, 
+        regularisedInputSequence, crossCorrelatedSequence, rocCurve ) )
+        
+# Average results
+if len( dataList ) > 1:
+    
+    curveList = [ data.rocCurve for data in dataList ]
+    averageROCCurve, varianceROCCurve = ROCCurve.averageROCCurves( curveList )
+
+else:
+    
+    averageROCCurve = dataList[ 0 ].rocCurve
+    varianceROCCurve = None
+   
+# Plot ROC Curve 
+figure = Figure( figsize=(8,6), dpi=72 )
+canvas = FigureCanvas( figure )
+axis = figure.add_subplot( 111 )
+    
+axis.plot( averageROCCurve.falsePositiveRates, averageROCCurve.truePositiveRates )
+
+if varianceROCCurve != None:
+    
+    diffBetweenErrorBars = 0.05 #1.0/(NUM_ERROR_BARS)
+    lastFPRValue = averageROCCurve.falsePositiveRates[ 0 ]
+    
+    errorFPR = []
+    errorTPR = []
+    errorErrFPR = []
+    errorErrTPR = []
+    for i in range( len( averageROCCurve.falsePositiveRates ) ):
+        
+        curFPRValue = averageROCCurve.falsePositiveRates[ i ]
+        if abs( curFPRValue - lastFPRValue ) >= diffBetweenErrorBars:
+            lastFPRValue = curFPRValue
+        
+            errorFPR.append( averageROCCurve.falsePositiveRates[ i ] )
+            errorTPR.append( averageROCCurve.truePositiveRates[ i ] )
+            errorErrFPR.append( varianceROCCurve.falsePositiveRates[ i ]*2.96 )
+            errorErrTPR.append( varianceROCCurve.truePositiveRates[ i ]*2.96 )
+            
+    axis.errorbar( errorFPR, errorTPR, 
+        xerr=errorErrFPR, yerr=errorErrTPR, linestyle='None' )
+        
+    #print errorFPR
+    #print errorTPR
+    #print lastFPRValue, averageROCCurve.falsePositiveRates[ -1 ]
+
+figure.savefig( "output.png" )  
+    
+# Plot accuracy
+
+        
+
  
 
         

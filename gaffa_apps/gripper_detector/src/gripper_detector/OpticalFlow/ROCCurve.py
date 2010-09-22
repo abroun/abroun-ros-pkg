@@ -26,6 +26,7 @@ class ROCCurve:
         return np.arange( 0.0, 1.0 + self.thresholdStepSize, self.thresholdStepSize )
         
     #---------------------------------------------------------------------------
+    @staticmethod
     def averageROCCurves( curveList ):
         
         numCurves = len( curveList )
@@ -39,7 +40,7 @@ class ROCCurve:
         avgROCCurve = ROCCurve( thresholdStepSize )
         varianceROCCurve = ROCCurve( thresholdStepSize )
         
-        thresholds = self.calculateThresholds()
+        thresholds = curveList[ 0 ].calculateThresholds()
         for thresholdIdx in range( len( thresholds ) ):
             
             # Calculate average for threshold
@@ -49,10 +50,10 @@ class ROCCurve:
             avgAccuracy = 0
             for curve in curveList:
                 
-                avgTruePositiveRate += curve.truePositiveRates
-                avgFalsePositiveRate += curve.falsePositiveRates
-                avgSpecificity += curve.specificity
-                avgAccuracy += curve.accuracy    
+                avgTruePositiveRate += curve.truePositiveRates[ thresholdIdx ]
+                avgFalsePositiveRate += curve.falsePositiveRates[ thresholdIdx ]
+                avgSpecificity += curve.specificity[ thresholdIdx ]
+                avgAccuracy += curve.accuracy[ thresholdIdx ]    
                 
             avgTruePositiveRate /= numCurves
             avgFalsePositiveRate /= numCurves
@@ -71,10 +72,10 @@ class ROCCurve:
             varianceAccuracy = 0
             for curve in curveList:
                 
-                varianceTruePositiveRate += (curve.truePositiveRates - avgTruePositiveRate)**2
-                varianceFalsePositiveRate += (curve.falsePositiveRates - avgFalsePositiveRate)**2
-                varianceSpecificity += (curve.specificity - avgSpecificity)**2
-                varianceAccuracy += (curve.accuracy - avgAccuracy)**2
+                varianceTruePositiveRate += (curve.truePositiveRates[ thresholdIdx ] - avgTruePositiveRate)**2
+                varianceFalsePositiveRate += (curve.falsePositiveRates[ thresholdIdx ] - avgFalsePositiveRate)**2
+                varianceSpecificity += (curve.specificity[ thresholdIdx ] - avgSpecificity)**2
+                varianceAccuracy += (curve.accuracy[ thresholdIdx ] - avgAccuracy)**2
                 
             varianceTruePositiveRate /= numCurves
             varianceFalsePositiveRate /= numCurves
@@ -95,7 +96,7 @@ class GripperDetectorROCCurve( ROCCurve ):
     
     #---------------------------------------------------------------------------
     def __init__( self, crossCorrelatedSequence, markerBuffer, thresholdStepSize = None ):
-        super.__init__( thresholdStepSize )
+        ROCCurve.__init__( self, thresholdStepSize )
         
         positiveNegativeCounts = np.bincount( markerBuffer.flat )
         actualNegativeCount = positiveNegativeCounts[ 0 ]
@@ -136,4 +137,4 @@ class GripperDetectorROCCurve( ROCCurve ):
             self.truePositiveRates.append( truePositiveRate )
             self.falsePositiveRates.append( falsePositiveRate )
             self.specificity.append( 1.0 - falsePositiveRate )
-            self.accuracy = (numTruePositives + numTrueNegatives)/totalSampleCount
+            self.accuracy.append( (numTruePositives + numTrueNegatives)/totalSampleCount )
