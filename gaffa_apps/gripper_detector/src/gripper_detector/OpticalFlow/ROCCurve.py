@@ -137,4 +137,4 @@ class GripperDetectorROCCurve( ROCCurve ):
             self.truePositiveRates.append( truePositiveRate )
             self.falsePositiveRates.append( falsePositiveRate )
             self.specificity.append( 1.0 - falsePositiveRate )
-            self.accuracy.append( (numTruePositives + numTrueNegatives)/totalSampleCount )
+            self.accuracy.append( float(numTruePositives + numTrueNegatives)/totalSampleCount )

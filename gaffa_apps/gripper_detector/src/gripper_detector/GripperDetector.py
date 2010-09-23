@@ -112,7 +112,7 @@ class MainWindow:
     OPTICAL_FLOW_RANGE_HEIGHT = 8
     
     GRIPPER_WAVE_FREQUENCY = 1.0    # Waves per second
-    GRIPPER_WAVE_AMPLITUDE = math.radians( 20.0 )/4.0
+    GRIPPER_WAVE_AMPLITUDE = math.radians( 10.0 )
     
     BUFFER_TIME_LENGTH = 100.0   # Should be greater that the total gripper detection time
     SAMPLES_PER_SECOND = 15.0
@@ -616,16 +616,16 @@ class MainWindow:
                     self.attemptToSetupDataBuffers()
                 else:
                     
-                    # Store the data.
-                    # NOTE: This all falls apart if we can't process the data fast enough
-                    self.gripperAngleBuffer[ self.curSampleIdx ] = lastGripperDisplacement
-                    self.opticalFlowBufferX[ :, :, self.curSampleIdx ] = self.opticalFlowX
-                    self.opticalFlowBufferY[ :, :, self.curSampleIdx ] = self.opticalFlowY
-                    
-                    self.curSampleIdx = (self.curSampleIdx + 1)%self.numBufferSamples
-                    
                     # Update gripper detection if it's on-going
                     if self.tryingToDetectGripper:
+                        # Store the data.
+                        # NOTE: This all falls apart if we can't process the data fast enough
+                        self.gripperAngleBuffer[ self.curSampleIdx ] = lastGripperDisplacement
+                        self.opticalFlowBufferX[ :, :, self.curSampleIdx ] = self.opticalFlowX
+                        self.opticalFlowBufferY[ :, :, self.curSampleIdx ] = self.opticalFlowY
+                        
+                        self.curSampleIdx = (self.curSampleIdx + 1)%self.numBufferSamples
+                                        
                         maxNumGripperDetectionSamples = int( self.totalGripperDetectionTime*self.SAMPLES_PER_SECOND )
                         gripperDetectionWaveStartSampleIdx = int( self.GRIPPER_DETECTION_WAVE_START_TIME*self.SAMPLES_PER_SECOND )
                         
