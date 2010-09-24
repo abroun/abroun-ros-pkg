@@ -21,6 +21,14 @@ pygtk.require('2.0')
 import gtk
 import gobject
 
+import matplotlib
+matplotlib.use('GTK')
+
+from matplotlib.figure import Figure
+from matplotlib.axes import Subplot
+from matplotlib.backends.backend_gtkagg import FigureCanvasGTKAgg as FigureCanvas
+from matplotlib.backends.backend_gtkagg import NavigationToolbar2GTKAgg as NavigationToolbar
+
 from abroun_gtk_gui.widgets import SequenceControl
 from gripper_detector.OpticalFlowFilter import OpticalFlowFilter
 from MotionDetectionFilter import MotionDetectionFilter
@@ -158,6 +166,8 @@ class MainWindow:
     OPTICAL_FLOW_RANGE_WIDTH = 8    # Range to look outside of a block for motion
     OPTICAL_FLOW_RANGE_HEIGHT = 8
     
+    PROCESSED_FRAME_DIFF = 2
+    
     # Classes of pixel in GrabCut algorithm
     GC_BGD = 0      # background
     GC_FGD = 1      # foreground
@@ -177,6 +187,8 @@ class MainWindow:
         self.frameIdx = 0
         self.workerThread = None
         self.numFramesProcessed = 0
+        self.graphCanvas = None
+        self.graphNavToolbar = None
             
         # Setup the GUI        
         builder = gtk.Builder()
@@ -185,6 +197,7 @@ class MainWindow:
         self.window = builder.get_object( "winMain" )   
         self.comboOutput_1_Mode = builder.get_object( "comboOutput_1_Mode" )
         self.comboOutput_2_Mode = builder.get_object( "comboOutput_2_Mode" )
+        self.vboxGraphs = builder.get_object( "vboxGraphs" )
 
         dwgInput = builder.get_object( "dwgInput" )
         dwgOutput_1 = builder.get_object( "dwgOutput_1" )
@@ -396,6 +409,8 @@ class MainWindow:
         if numFrames == 0:
             print "Error: No frames in bag file"
             return
+            
+        numFrames = int( math.ceil( float( numFrames )/int( self.PROCESSED_FRAME_DIFF ) ) )
         
         # Throw away existing data and prepare to process the bag file
         if self.workerThread != None and self.workerThread.is_alive():
@@ -408,6 +423,7 @@ class MainWindow:
         self.opticalFlowListX = [ None for i in range( numFrames ) ]
         self.opticalFlowListY = [ None for i in range( numFrames ) ]
         self.segmentationList = [ None for i in range( numFrames ) ]
+        self.maxMotionCounts = [ 0 for i in range( numFrames ) ]
         self.numFramesProcessed = 0
         
         # Kick off worker thread to process the bag file
@@ -421,6 +437,7 @@ class MainWindow:
     #---------------------------------------------------------------------------
     def processBag( self, bag ):
     
+        bagFrameIdx = 0
         frameIdx = 0
         
         # Setup filters
@@ -433,13 +450,17 @@ class MainWindow:
         # Process bag file
         for topic, msg, t in bag.read_messages():
             
-            print "Processing image", frameIdx
-            
             if self.workCancelled:
                 # We've been given the signal to quit
                 break
             
             if msg._type == "sensor_msgs/Image":
+                
+                bagFrameIdx += 1
+                if (bagFrameIdx-1)%self.PROCESSED_FRAME_DIFF != 0:
+                    continue
+                
+                print "Processing image", frameIdx
                 
                 # Get input image
                 image = cv.CreateMatHeader( msg.height, msg.width, cv.CV_8UC3 )
@@ -456,6 +477,17 @@ class MainWindow:
                 # Detect motion
                 motionImage = motionDetectionFilter.calcMotion( grayImage )
                 
+                # Work out the maximum amount of motion we've seen in a single frame so far
+                motionCount = motionImage[ motionImage > 0 ].size
+                
+                if frameIdx == 0:
+                    lastMotionCount = 0
+                else:
+                    lastMotionCount = self.maxMotionCounts[ frameIdx - 1 ]
+                    
+                if motionCount < lastMotionCount:
+                    motionCount = lastMotionCount
+                
                 # Segment the image
                 workingMask = np.copy( motionImage )
                 kernel = cv.CreateStructuringElementEx( 
@@ -465,7 +497,7 @@ class MainWindow:
                 cv.Dilate( workingMask, workingMask )
                 possibleForeground = workingMask > 0
             
-                if workingMask[ possibleForeground ].size >= 800:
+                if workingMask[ possibleForeground ].size >= 875676567800:
                     
                     fgModel = cv.CreateMat( 1, 5*13, cv.CV_32FC1 )
                     bgModel = cv.CreateMat( 1, 5*13, cv.CV_32FC1 )
@@ -491,11 +523,46 @@ class MainWindow:
                 self.opticalFlowListY[ frameIdx ] = opticalFlowArrayY
                 self.motionImageList[ frameIdx ] = motionImage
                 self.segmentationList[ frameIdx ] = segmentation
+                self.maxMotionCounts[ frameIdx ] = motionCount
                 
                 frameIdx += 1
                 self.numFramesProcessed += 1
+                
+        if not self.workCancelled:
+            self.refreshGraphDisplay()
             
         print "Finished processing bag file"
+        
+    #---------------------------------------------------------------------------
+    def refreshGraphDisplay( self ):
+        
+        # Remove existing graph items
+        if self.graphCanvas != None:   
+            self.vboxGraphs.remove( self.graphCanvas )
+            self.graphCanvas.destroy()  
+            self.graphCanvas = None   
+        if self.graphNavToolbar != None:
+            self.vboxGraphs.remove( self.graphNavToolbar )
+            self.graphNavToolbar.destroy()  
+            self.graphNavToolbar = None   
+            
+        # Draw the graphs
+        self.graphFigure = Figure( figsize=(8,6), dpi=72 )
+        self.graphAxis = self.graphFigure.add_subplot( 111 )
+        self.graphAxis.plot( range( 1, len( self.maxMotionCounts )+1 ), self.maxMotionCounts )
+        
+        # Build the new graph display
+        self.graphCanvas = FigureCanvas( self.graphFigure ) # a gtk.DrawingArea
+        self.graphCanvas.show()
+        self.graphNavToolbar = NavigationToolbar( self.graphCanvas, self.window )
+        self.graphNavToolbar.lastDir = '/var/tmp/'
+        self.graphNavToolbar.show()
+        
+        # Show the graph
+        self.vboxGraphs.pack_start( self.graphCanvas, True, True )
+        self.vboxGraphs.pack_start( self.graphNavToolbar, expand=False, fill=False )
+        self.vboxGraphs.show()
+        self.vboxGraphs.show()
 
     #---------------------------------------------------------------------------
     def update( self ):

@@ -112,7 +112,7 @@ class MainWindow:
     OPTICAL_FLOW_RANGE_HEIGHT = 8
     
     GRIPPER_WAVE_FREQUENCY = 1.0    # Waves per second
-    GRIPPER_WAVE_AMPLITUDE = math.radians( 10.0 )
+    GRIPPER_WAVE_AMPLITUDE = math.radians( 20.0 )
     
     BUFFER_TIME_LENGTH = 100.0   # Should be greater that the total gripper detection time
     SAMPLES_PER_SECOND = 15.0
@@ -172,8 +172,8 @@ class MainWindow:
         servoConfigList = [ self.servoConfigDict[ servoName ] for servoName in self.servoConfigDict ]
         self.roboticArm = RoboticArm( gaffa_teleop.LynxmotionArmDescription.ARM_DH_PROXIMAL, servoConfigList )
         
-        self.cameraImageTopic = rospy.Subscriber( "/camera/image", 
-            sensor_msgs.msg.Image, self.cameraImageCallback )
+        #self.cameraImageTopic = rospy.Subscriber( "/camera/image", 
+        #    sensor_msgs.msg.Image, self.cameraImageCallback )
             
         self.opticalFlowFilter = OpticalFlowFilter(
             self.OPTICAL_FLOW_BLOCK_WIDTH, self.OPTICAL_FLOW_BLOCK_HEIGHT,
