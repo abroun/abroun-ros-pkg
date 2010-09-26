@@ -495,18 +495,73 @@ class MainWindow:
                     anchorX=1, anchorY=1, shape=cv.CV_SHAPE_CROSS )
                 cv.Erode( workingMask, workingMask, kernel )
                 cv.Dilate( workingMask, workingMask )
+                
+                extraExtraMask = np.copy( workingMask )
+                cv.Dilate( extraExtraMask, extraExtraMask )
+                cv.Dilate( extraExtraMask, extraExtraMask )
+                cv.Dilate( extraExtraMask, extraExtraMask )
+                cv.Dilate( extraExtraMask, extraExtraMask )
+                cv.Dilate( extraExtraMask, extraExtraMask )
+                cv.Dilate( extraExtraMask, extraExtraMask )
+                
+                allMask = np.copy( extraExtraMask )
+                cv.Dilate( allMask, allMask )
+                cv.Dilate( allMask, allMask )
+                cv.Dilate( allMask, allMask )
+                cv.Dilate( allMask, allMask )
+                cv.Dilate( allMask, allMask )
+                cv.Dilate( allMask, allMask )
+                
                 possibleForeground = workingMask > 0
             
-                if workingMask[ possibleForeground ].size >= 875676567800:
+                if workingMask[ possibleForeground ].size >= 100 \
+                    and frameIdx >= 16:
+                        
+                    print "Msk size", workingMask[ possibleForeground ].size
+                    print workingMask[ 0, 0:10 ]
                     
                     fgModel = cv.CreateMat( 1, 5*13, cv.CV_32FC1 )
                     bgModel = cv.CreateMat( 1, 5*13, cv.CV_32FC1 )
-                    workingMask[ possibleForeground ] = self.GC_PR_FGD
-                    workingMask[ possibleForeground == False ] = self.GC_PR_BGD
+                    #workingMask[ possibleForeground ] = self.GC_FGD
+                    #workingMask[ possibleForeground == False ] = self.GC_PR_BGD
+                    
+                    #workingMask[ : ] = self.GC_PR_BGD
+                    #workingMask[ possibleForeground ] = self.GC_FGD
+                    
+                    workingMask[ : ] = self.GC_BGD
+                    workingMask[ allMask > 0 ] = self.GC_PR_BGD
+                    workingMask[ extraExtraMask > 0 ] = self.GC_PR_FGD
+                    workingMask[ possibleForeground ] = self.GC_FGD
+                    
+                    
+                    if frameIdx == 16:
+                        # Save mask
+                        maskCopy = np.copy( workingMask )
+                        maskCopy[ maskCopy == self.GC_BGD ] = 0
+                        maskCopy[ maskCopy == self.GC_PR_BGD ] = 64
+                        maskCopy[ maskCopy == self.GC_PR_FGD ] = 128
+                        maskCopy[ maskCopy == self.GC_FGD ] = 255
+                        print "Unused pixels", \
+                            maskCopy[ (maskCopy != 255) & (maskCopy != 0) ].size
+                          
+                        outputImage = cv.CreateMat( msg.height, msg.width, cv.CV_8UC3 )
+                        cv.CvtColor( maskCopy, outputImage, cv.CV_GRAY2BGR )
+                        
+                        cv.SaveImage( "output.png", image );
+                        cv.SaveImage( "outputMask.png", outputImage ); 
+                        
+                        print "Saved images"
+                        #return 
+                        
+                    
+                    #print "Set Msk size", workingMask[ workingMask == self.GC_PR_FGD ].size
+                
+                    imageCopy = np.copy( image )
+                    cv.CvtColor( imageCopy, imageCopy, cv.CV_BGR2RGB )
                 
                     print "Start seg"
-                    cv.GrabCut( image, workingMask, 
-                        (0,0,0,0), fgModel, bgModel, 1, self.GC_INIT_WITH_MASK )
+                    cv.GrabCut( imageCopy, workingMask, 
+                        (0,0,0,0), fgModel, bgModel, 6, self.GC_INIT_WITH_MASK )
                     print "Finish seg"
                 
                     segmentation = np.copy( image )
@@ -559,8 +614,8 @@ class MainWindow:
         self.graphNavToolbar.show()
         
         # Show the graph
-        self.vboxGraphs.pack_start( self.graphCanvas, True, True )
         self.vboxGraphs.pack_start( self.graphNavToolbar, expand=False, fill=False )
+        self.vboxGraphs.pack_start( self.graphCanvas, True, True )
         self.vboxGraphs.show()
         self.vboxGraphs.show()
 

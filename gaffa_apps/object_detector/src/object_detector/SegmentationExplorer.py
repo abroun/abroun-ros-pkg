@@ -126,6 +126,7 @@ class Display:
 class MainWindow:
     
     FOREGROUND_BRUSH_COLOUR = np.array( [ 255, 255, 0 ], dtype=np.uint8 )
+    PROBABLY_FOREGROUND_BRUSH_COLOUR = np.array( [ 0, 255, 0 ], dtype=np.uint8 )
     BACKGROUND_BRUSH_COLOUR = np.array( [ 0, 0, 255 ], dtype=np.uint8 )
     
     # Classes of pixel in GrabCut algorithm
@@ -212,9 +213,14 @@ class MainWindow:
                     & (indices[ 0 ] < self.maskArray.shape[ 0 ]) \
                     & (indices[ 1 ] < self.maskArray.shape[ 1 ]) ) ]
             self.maskArray[ validIndices[ 0 ], validIndices[ 1 ] ] = pixelClass
+            
+            self.redrawImageWithMask()
              
+    #---------------------------------------------------------------------------
+    def redrawImageWithMask( self ):
             self.composedImage = np.copy( self.image )
             self.composedImage[ self.maskArray == self.GC_FGD ] = self.FOREGROUND_BRUSH_COLOUR
+            self.composedImage[ self.maskArray == self.GC_PR_FGD ] = self.PROBABLY_FOREGROUND_BRUSH_COLOUR
             self.composedImage[ self.maskArray == self.GC_BGD ] = self.BACKGROUND_BRUSH_COLOUR
             
             self.dwgImageDisplay.setImageFromNumpyArray( self.composedImage )
@@ -273,6 +279,43 @@ class MainWindow:
             
             self.dwgImageDisplay.setImageFromOpenCVMatrix( self.image )
             self.dwgSegmentationDisplay.setImageFromNumpyArray( self.segmentation )            
+    
+    #---------------------------------------------------------------------------
+    def onMenuItemOpenMaskActivate( self, widget ):
+        
+        # Map for translating mask values
+        PIXEL_MAP = { 
+            0 : self.GC_BGD,
+            64 : self.GC_PR_BGD,
+            128 : self.GC_PR_FGD,
+            255 : self.GC_FGD }
+           
+        if self.image == None:
+            return  # No image to apply mask to yet
+            
+        filename = self.chooseImageFile()
+        
+        if filename != None:
+            maskImage = cv.LoadImageM( filename )
+            if maskImage.width != self.image.width \
+                or maskImage.height != self.image.height:
+                    
+                print "Error: Mask doesn't match the size of the current image"
+                return
+            
+            #maskImageGray = cv.CreateMat( self.image.height, self.image.width, cv.CV_8UC1 )
+            self.maskArray = np.ndarray( ( self.image.height, self.image.width ), np.uint8 )
+            cv.CvtColor( maskImage, self.maskArray, cv.CV_BGR2GRAY )
+            
+            # Convert the pixel values over to the correct values for the pixel type
+            translationArray = \
+                [ ( self.maskArray == sourcePixelValue, PIXEL_MAP[ sourcePixelValue ] ) \
+                    for sourcePixelValue in PIXEL_MAP ]
+            for translation in translationArray:
+                self.maskArray[ translation[ 0 ] ] = translation[ 1 ]
+                
+            # Redraw the main image to show the mask
+            self.redrawImageWithMask()
     
     #---------------------------------------------------------------------------
     def onMenuItemQuitActivate( self, widget ):
