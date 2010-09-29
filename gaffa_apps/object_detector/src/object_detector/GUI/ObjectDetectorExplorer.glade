@@ -221,6 +221,9 @@
       <row>
         <col id="0" translatable="yes">Segmentation</col>
       </row>
+      <row>
+        <col id="0" translatable="yes">Saliency</col>
+      </row>
     </data>
   </object>
 </interface>

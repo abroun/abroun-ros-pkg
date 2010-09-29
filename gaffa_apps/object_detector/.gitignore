@@ -1,6 +1,7 @@
 # Directories
 bin
 build
+lib
 msg_gen
 
 # Files

@@ -32,6 +32,10 @@ from matplotlib.backends.backend_gtkagg import NavigationToolbar2GTKAgg as Navig
 from abroun_gtk_gui.widgets import SequenceControl
 from gripper_detector.OpticalFlowFilter import OpticalFlowFilter
 from MotionDetectionFilter import MotionDetectionFilter
+from ImageFlowFilter import ImageFlowFilter
+from ResidualSaliencyFilter import ResidualSaliencyFilter
+
+import PyBlobLib
 
 #-------------------------------------------------------------------------------
 class Display:
@@ -157,6 +161,7 @@ class OutputMode:
     OPTICAL_FLOW = "Optical Flow"
     DETECTED_MOTION = "Detected Motion"
     SEGMENTATION = "Segmentation"
+    SALIENCY = "Saliency"
 
 #-------------------------------------------------------------------------------
 class MainWindow:
@@ -166,7 +171,7 @@ class MainWindow:
     OPTICAL_FLOW_RANGE_WIDTH = 8    # Range to look outside of a block for motion
     OPTICAL_FLOW_RANGE_HEIGHT = 8
     
-    PROCESSED_FRAME_DIFF = 2
+    PROCESSED_FRAME_DIFF = 3
     
     # Classes of pixel in GrabCut algorithm
     GC_BGD = 0      # background
@@ -262,6 +267,8 @@ class MainWindow:
                 self.dwgOutput_1_Display.setImageFromNumpyArray( self.motionImageList[ self.frameIdx ] )
             elif output_1_Mode == OutputMode.SEGMENTATION:
                 self.dwgOutput_1_Display.setImageFromNumpyArray( self.segmentationList[ self.frameIdx ] )
+            elif output_1_Mode == OutputMode.SALIENCY:
+                self.dwgOutput_1_Display.setImageFromNumpyArray( self.saliencyMapList[ self.frameIdx ] )
                 
             output_2_Mode = self.comboOutput_2_Mode.get_active_text()
             if output_2_Mode == OutputMode.OPTICAL_FLOW:
@@ -269,7 +276,15 @@ class MainWindow:
             elif output_2_Mode == OutputMode.DETECTED_MOTION:
                 self.dwgOutput_2_Display.setImageFromNumpyArray( self.motionImageList[ self.frameIdx ] )
             elif output_2_Mode == OutputMode.SEGMENTATION:
+                
+                diffImage = np.array( self.motionImageList[ self.frameIdx ], dtype=np.int32 ) \
+                     - np.array( self.imageFlowList[ self.frameIdx ][ 3 ], dtype=np.int32 )
+                diffImage = np.array( np.maximum( diffImage, 0 ), dtype=np.uint8 )
+                
+                #self.dwgOutput_2_Display.setImageFromNumpyArray( diffImage )
                 self.dwgOutput_2_Display.setImageFromNumpyArray( self.segmentationList[ self.frameIdx ] )
+            elif output_2_Mode == OutputMode.SALIENCY:
+                self.dwgOutput_2_Display.setImageFromNumpyArray( self.saliencyMapList[ self.frameIdx ] )
         
     #---------------------------------------------------------------------------
     def chooseBagFile( self ):
@@ -389,6 +404,26 @@ class MainWindow:
                         blockCentreX += self.OPTICAL_FLOW_BLOCK_WIDTH
                         
                     blockCentreY += self.OPTICAL_FLOW_BLOCK_HEIGHT
+                    
+        elif outputMode == OutputMode.SALIENCY:
+             
+            graphicsContext = widget.window.new_gc()
+            graphicsContext.set_rgb_fg_color( gtk.gdk.Color( 0, 65535, 0 ) )
+                    
+            for cluster in self.saliencyClusterList[ self.frameIdx ]:
+                
+                mean = cluster[ 0 ]
+                stdDev = cluster[ 1 ]
+                arcX = int( imgRect.x + mean[ 0 ] )
+                arcY = int( imgRect.y + mean[ 1 ] )
+                
+                # Draw a circle to represent the cluster
+                arcWidth = arcHeight = int( stdDev * 2 )
+            
+                drawFilledArc = False
+                            
+                widget.window.draw_arc( graphicsContext, 
+                    drawFilledArc, arcX, arcY, arcWidth, arcHeight, 0, 360 * 64 )
 
     #---------------------------------------------------------------------------
     def tryToLoadBagFile( self, bagFilename ):
@@ -423,7 +458,10 @@ class MainWindow:
         self.opticalFlowListX = [ None for i in range( numFrames ) ]
         self.opticalFlowListY = [ None for i in range( numFrames ) ]
         self.segmentationList = [ None for i in range( numFrames ) ]
+        self.imageFlowList = [ ( 0, 0, 0, None ) for i in range( numFrames ) ]
         self.maxMotionCounts = [ 0 for i in range( numFrames ) ]
+        self.saliencyMapList = [ None for i in range( numFrames ) ]
+        self.saliencyClusterList = [ [] for i in range( numFrames ) ]
         self.numFramesProcessed = 0
         
         # Kick off worker thread to process the bag file
@@ -446,6 +484,8 @@ class MainWindow:
             self.OPTICAL_FLOW_RANGE_WIDTH, self.OPTICAL_FLOW_RANGE_HEIGHT )
             
         motionDetectionFilter = MotionDetectionFilter()
+        imageFlowFilter = ImageFlowFilter()
+        residualSaliencyFilter = ResidualSaliencyFilter()
             
         # Process bag file
         for topic, msg, t in bag.read_messages():
@@ -469,6 +509,7 @@ class MainWindow:
                 # Convert to grayscale
                 grayImage = cv.CreateMat( msg.height, msg.width, cv.CV_8UC1 )
                 cv.CvtColor( image, grayImage, cv.CV_BGR2GRAY )
+                grayImageNumpPy = np.array( grayImage )
                 
                 # Calculate optical flow
                 opticalFlowArrayX, opticalFlowArrayY = \
@@ -476,6 +517,59 @@ class MainWindow:
                     
                 # Detect motion
                 motionImage = motionDetectionFilter.calcMotion( grayImage )
+                
+                # Calculate image flow
+                imageFlow = imageFlowFilter.calcImageFlow( motionImage )
+                
+                # Calculate saliency map
+                saliencyMap, largeSaliencyMap = residualSaliencyFilter.calcSaliencyMap( grayImageNumpPy )
+                
+                largeSaliencyMap = PyBlobLib.labelBlobs( largeSaliencyMap )
+                
+                # Threshold the saliency map
+                #largeSaliencyMap = (largeSaliencyMap > 128).astype(np.uint8) * 255
+                #cv.AdaptiveThreshold( largeSaliencyMap, largeSaliencyMap, 255 )
+                
+                # Detect clusters within the saliency map
+                #NUM_CLUSTERS = 5
+                
+                #numSamples = np.sum( saliencyMap )
+                #sampleList = np.ndarray( ( numSamples, 2 ), dtype=np.float32 )
+                
+                #sampleListIdx = 0
+                #for y in range( saliencyMap.shape[ 0 ] ):
+                    #for x in range( saliencyMap.shape[ 1 ] ):
+                        
+                        #numNewSamples = saliencyMap[ y, x ]
+                        #if numNewSamples > 0:
+                            #sampleList[ sampleListIdx:sampleListIdx+numNewSamples, 0 ] = x
+                            #sampleList[ sampleListIdx:sampleListIdx+numNewSamples, 1 ] = y
+                            #sampleListIdx += numNewSamples
+                            
+                #sampleList[ 0:numSamples/2 ] = ( 20, 20 )
+                #sampleList[ numSamples/2: ] = ( 200, 200 )
+                
+                #labelList = np.ndarray( ( numSamples, 1 ), dtype=np.int32 )
+                #cv.KMeans2( sampleList, NUM_CLUSTERS, labelList, 
+                    #(cv.CV_TERMCRIT_ITER | cv.CV_TERMCRIT_EPS, 10, 0.01) )
+                    
+                #saliencyScaleX = float( largeSaliencyMap.shape[ 1 ] ) / saliencyMap.shape[ 1 ]
+                #saliencyScaleY = float( largeSaliencyMap.shape[ 0 ] ) / saliencyMap.shape[ 0 ]
+                clusterList = []
+                #for clusterIdx in range( NUM_CLUSTERS ):
+                    
+                    #clusterSamples = sampleList[ 
+                        #np.where( labelList == clusterIdx )[ 0 ], : ]
+
+                    #if clusterSamples.size <= 0:
+                        #mean = ( 0.0, 0.0 )
+                        #stdDev = 0.0
+                    #else:
+                        #mean = clusterSamples.mean( axis=0 )
+                        #mean = ( mean[ 0 ]*saliencyScaleX, mean[ 1 ]*saliencyScaleY )
+                        #stdDev = clusterSamples.std()*saliencyScaleX
+                    
+                    #clusterList.append( ( mean, stdDev ) )
                 
                 # Work out the maximum amount of motion we've seen in a single frame so far
                 motionCount = motionImage[ motionImage > 0 ].size
@@ -488,8 +582,15 @@ class MainWindow:
                 if motionCount < lastMotionCount:
                     motionCount = lastMotionCount
                 
+                # Work out diffImage    
+                diffImage = np.array( motionImage, dtype=np.int32 ) \
+                     - np.array( imageFlow[ 3 ], dtype=np.int32 )
+                diffImage = np.array( np.maximum( diffImage, 0 ), dtype=np.uint8 )
+                
+                
                 # Segment the image
-                workingMask = np.copy( motionImage )
+                #workingMask = np.copy( motionImage )
+                workingMask = np.copy( diffImage )
                 kernel = cv.CreateStructuringElementEx( 
                     cols=3, rows=3, 
                     anchorX=1, anchorY=1, shape=cv.CV_SHAPE_CROSS )
@@ -579,6 +680,9 @@ class MainWindow:
                 self.motionImageList[ frameIdx ] = motionImage
                 self.segmentationList[ frameIdx ] = segmentation
                 self.maxMotionCounts[ frameIdx ] = motionCount
+                self.imageFlowList[ frameIdx ] = imageFlow
+                self.saliencyMapList[ frameIdx ] = largeSaliencyMap
+                self.saliencyClusterList[ frameIdx ] = clusterList
                 
                 frameIdx += 1
                 self.numFramesProcessed += 1

@@ -21,8 +21,17 @@ set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 #uncomment if you have defined services
 #rosbuild_gensrv()
 
+#include($ENV{ROS_ROOT}/core/rosbuild/FindPkgConfig.cmake)
+#pkg_check_modules(GDKPIXBUF REQUIRED gdk-pixbuf-2.0)
+include_directories( 
+    /usr/include/python2.6 
+    /usr/share/pyshared/numpy/core/include )
+#link_directories(${GDKPIXBUF_LIBRARY_DIRS})
+
+
 #common commands for building c++ executables and libraries
-#rosbuild_add_library(${PROJECT_NAME} src/example.cpp)
+rosbuild_add_library( PyBlobLib src/PyBlobLib.cpp )
+set_property( TARGET PyBlobLib PROPERTY PREFIX "" )
 #target_link_libraries(${PROJECT_NAME} another_library)
 #rosbuild_add_boost_directories()
 #rosbuild_link_boost(${PROJECT_NAME} thread)
