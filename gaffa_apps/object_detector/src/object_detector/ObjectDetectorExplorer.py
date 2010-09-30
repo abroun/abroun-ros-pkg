@@ -524,7 +524,12 @@ class MainWindow:
                 # Calculate saliency map
                 saliencyMap, largeSaliencyMap = residualSaliencyFilter.calcSaliencyMap( grayImageNumpPy )
                 
-                largeSaliencyMap = PyBlobLib.labelBlobs( largeSaliencyMap )
+                blobMap = np.where( largeSaliencyMap > 128, 255, 0 ).astype( np.uint8 )
+                
+                blobMap, numBlobs = PyBlobLib.labelBlobs( blobMap )
+                print "found", numBlobs, "blobs"
+                
+                largeSaliencyMap = np.where( largeSaliencyMap > 128, 255, 0 ).astype( np.uint8 )
                 
                 # Threshold the saliency map
                 #largeSaliencyMap = (largeSaliencyMap > 128).astype(np.uint8) * 255

@@ -5,6 +5,7 @@
 #include "Python.h"
 #include "numpy/arrayobject.h"
 #include <math.h>
+#include "BlobLib/BlobLib.h"
 
 //------------------------------------------------------------------------------
 static PyObject* labelBlobs( PyObject* pSelf, PyObject* args )
@@ -38,20 +39,11 @@ static PyObject* labelBlobs( PyObject* pSelf, PyObject* args )
     int xStride = PyArray_STRIDE( pOutputArray, 1 );
     int height = PyArray_DIM( pOutputArray, 0 );
     int width = PyArray_DIM( pOutputArray, 1 );
-    int extraYStep = yStride - width*xStride;
-      
-    for ( int y = 0; y < height/2; y++ )
-    {
-        for ( int x = 0; x < width; x++ )
-        {
-            *pData = 255;
-            pData += xStride;
-        }
-        pData += extraYStep;
-    }
-
+     
+    int numBlobs = SegmentByteArray( pData, width, height, xStride, yStride, eCT_Connect8 );
+    
     // Return the processed data
-    return pOutputArray;
+    return Py_BuildValue( "Oi", pOutputArray, numBlobs );
 }
 
 //------------------------------------------------------------------------------
