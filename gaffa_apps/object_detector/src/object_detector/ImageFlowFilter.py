@@ -28,9 +28,6 @@ class ImageFlowFilter:
     def calcImageFlow( self, targetImageGray, templateImageGray=None ):
         """Tries to move a template image to match a target image"""
         
-        targetImageGray = scipy.ndimage.interpolation.zoom( 
-            targetImageGray, 0.25 ).astype( np.int32 )
-        
         if templateImageGray == None:
             
             # Use the last image as the template if we have it
@@ -38,10 +35,6 @@ class ImageFlowFilter:
                 templateImageGray = targetImageGray
             else:
                 templateImageGray = self.lastImageGray
-        
-        else:
-            templateImageGray = scipy.ndimage.interpolation.zoom( 
-                templateImageGray, 0.25 ).astype( np.int32 )
         
         # Save the current image
         self.lastImageGray = targetImageGray
@@ -57,8 +50,14 @@ class ImageFlowFilter:
         rotationAngle = 0
         bestTransformedImage = None
         
-        imageWidth = templateImageGray.shape[ 1 ]
-        imageHeight = templateImageGray.shape[ 0 ]
+        smallTargetImageGray = scipy.ndimage.interpolation.zoom( 
+            targetImageGray, 0.25 ).astype( np.int32 )
+            
+        smallTemplateImageGray = scipy.ndimage.interpolation.zoom( 
+                templateImageGray, 0.25 ).astype( np.int32 )
+        
+        imageWidth = smallTemplateImageGray.shape[ 1 ]
+        imageHeight = smallTemplateImageGray.shape[ 0 ]
         transformedImage = np.ndarray( ( imageHeight, imageWidth ), dtype=np.int32 )
         
         # Try all possible translations
@@ -71,7 +70,7 @@ class ImageFlowFilter:
             for yOffset in translationOffsetArray:
                 
                 scipy.ndimage.interpolation.shift( 
-                    templateImageGray, ( yOffset, xOffset ), output=transformedImage )
+                    smallTemplateImageGray, ( yOffset, xOffset ), output=transformedImage )
                 
                 #transformedImage.fill( 0 )
                 
@@ -88,7 +87,7 @@ class ImageFlowFilter:
                 #transformedImage[ dstY:dstHeight, dstX:dstWidth ] = \
                     #lastImageGray[ srcY:srcHeight, srcX:srcWidth ]
                     
-                transformSSD = np.sum( np.square( transformedImage - targetImageGray ) )
+                transformSSD = np.sum( np.square( transformedImage - smallTargetImageGray ) )
                 newTransDistance = math.sqrt( xOffset**2 + yOffset**2 )
                 
                 if minSSD == None \
@@ -101,9 +100,12 @@ class ImageFlowFilter:
                     bestTransformedImage = np.copy( transformedImage )
                     minSSD = transformSSD
         
+        newImage = scipy.ndimage.interpolation.shift( 
+                    templateImageGray, ( 4.0*transY, 4.0*transX ) )
+        
         #newImage = bestTransformedImage
-        newImage = np.array( 
-            scipy.ndimage.interpolation.zoom( bestTransformedImage.astype( np.uint8 ), 4.0 ) )
+        #newImage = np.array( 
+        #    scipy.ndimage.interpolation.zoom( bestTransformedImage.astype( np.uint8 ), 4.0 ) )
         #newImage[ newImage > 255 ] = 255
         #newImage = np.array( newImage, dtype=np.uint8 )
         #newImage[ newImage > 0 ] = 255

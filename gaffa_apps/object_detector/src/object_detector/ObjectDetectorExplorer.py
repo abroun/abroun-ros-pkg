@@ -528,6 +528,7 @@ class MainWindow:
                 
                 # Work out the left most point in the image where motion appears
                 motionTest = np.copy( motionImage )
+                
                 cv.Erode( motionTest, motionTest )
                 if frameIdx == 0:
                     leftMostMotion = motionImage.shape[ 1 ]
@@ -543,6 +544,8 @@ class MainWindow:
                 
                 segmentationMask = np.zeros( ( msg.height, msg.width ), dtype=np.uint8 )
                 
+                FRAMES_BACK = 3
+                
                 if impactFrameIdx == None:        
                     if leftMostMotionDiff > 18 and leftMostMotion < 0.75*msg.width:
                         
@@ -550,30 +553,40 @@ class MainWindow:
                         impactFrameIdx = frameIdx
                     
                 else:
-                    if frameIdx - impactFrameIdx == 2:
+                    if frameIdx - impactFrameIdx == FRAMES_BACK:
                         
                         # Should now have enough info to segment object
                         impactMotionImage = self.motionImageList[ impactFrameIdx ]
                         
-                        postImpactFarFlow = imageFlowFilter.calcImageFlow( impactMotionImage, motionImage )
+                        postImpactRealFarFlow = imageFlowFilter.calcImageFlow( impactMotionImage, motionImage )
+                        postImpactFarFlow = imageFlowFilter.calcImageFlow( impactMotionImage, self.motionImageList[ impactFrameIdx + 2 ] )
                         postImpactNearFlow = imageFlowFilter.calcImageFlow( impactMotionImage, self.motionImageList[ impactFrameIdx + 1 ] )
                         
-                        segmentationMask = np.maximum( np.maximum( 
-                            impactMotionImage, postImpactNearFlow[ 3 ] ), postImpactFarFlow[ 3 ] )
+                        segmentationMask = np.maximum( np.maximum( np.maximum( 
+                            impactMotionImage, postImpactNearFlow[ 3 ] ), postImpactFarFlow[ 3 ] ), postImpactRealFarFlow[ 3 ] )
                         cv.Dilate( segmentationMask, segmentationMask )
                         
-                        preImpactRealFarFlow = imageFlowFilter.calcImageFlow( impactMotionImage, self.motionImageList[ impactFrameIdx - 3 ] )
-                        preImpactFarFlow = imageFlowFilter.calcImageFlow( impactMotionImage, self.motionImageList[ impactFrameIdx - 2 ] )
-                        preImpactNearFlow = imageFlowFilter.calcImageFlow( impactMotionImage, self.motionImageList[ impactFrameIdx - 1 ] )
+                        preImpactRealFarFlow = imageFlowFilter.calcImageFlow( impactMotionImage, self.motionImageList[ impactFrameIdx - 8 ] )
+                        preImpactFarFlow = imageFlowFilter.calcImageFlow( impactMotionImage, self.motionImageList[ impactFrameIdx - 6 ] )
+                        preImpactNearFlow = imageFlowFilter.calcImageFlow( impactMotionImage, self.motionImageList[ impactFrameIdx - 4 ] )
                         
                         subMask = np.maximum( np.maximum( 
                             preImpactRealFarFlow[ 3 ], preImpactFarFlow[ 3 ] ), preImpactNearFlow[ 3 ] )
+                        cv.Erode( subMask, subMask )
                         cv.Dilate( subMask, subMask )
-                            
-                        diffImage = np.array( segmentationMask, dtype=np.int32 ) \
-                            - np.array( subMask, dtype=np.int32 )
-                        diffImage = np.array( np.maximum( diffImage, 0 ), dtype=np.uint8 )
-                        segmentationMask = np.where( diffImage > 128, 255, 0 ).astype( np.uint8 )
+                        cv.Dilate( subMask, subMask )
+                        cv.Dilate( subMask, subMask )
+                        
+                        subMask[ subMask > 0 ] = 255
+                        diffImage = segmentationMask.astype( np.int32 ) - subMask.astype( np.int32 )
+                        diffImage[ diffImage < 0 ] = 0
+                        diffImage = diffImage.astype( np.uint8 )
+                        cv.Erode( diffImage, diffImage )
+                        #diffImage[ diffImage > 0 ] = 255
+
+                        #segmentationMask = subMask
+                        segmentationMask = diffImage
+                        #segmentationMask = np.where( diffImage > 128, 255, 0 ).astype( np.uint8 )
                 
                 # Calculate image flow
                 #imageFlow = imageFlowFilter.calcImageFlow( motionImage )
@@ -731,20 +744,51 @@ class MainWindow:
                     
                     #print "Set Msk size", workingMask[ workingMask == self.GC_PR_FGD ].size
                 
-                    imageCopy = np.copy( image )
+                    imageToSegment = image #self.inputImageList[ frameIdx - FRAMES_BACK ]
+                
+                    imageCopy = np.copy( imageToSegment )
                     cv.CvtColor( imageCopy, imageCopy, cv.CV_BGR2RGB )
                 
                     print "Start seg"
                     cv.GrabCut( imageCopy, workingMask, 
-                        (0,0,0,0), fgModel, bgModel, 6, self.GC_INIT_WITH_MASK )
+                        (0,0,0,0), fgModel, bgModel, 12, self.GC_INIT_WITH_MASK )
                     print "Finish seg"
                 
-                    segmentation = np.copy( image )
+                    segmentation = np.copy( imageToSegment )
                     segmentation[ (workingMask != self.GC_PR_FGD) & (workingMask != self.GC_FGD) ] = 0
                 
                     
                     black = (workingMask != self.GC_PR_FGD) & (workingMask != self.GC_FGD)
                     motionImage = np.where( black, 0, 255 ).astype( np.uint8 )
+                    
+                    # Refine the segmentation
+                    REFINE_SEG = False
+                    if REFINE_SEG:
+                        motionImageCopy = np.copy( motionImage )
+                        cv.Erode( motionImageCopy, motionImageCopy )
+                        #cv.Erode( motionImageCopy, motionImageCopy )
+                        #cv.Erode( motionImageCopy, motionImageCopy )
+                        
+                        workingMask[ motionImageCopy > 0 ] = self.GC_PR_FGD
+                        workingMask[ motionImageCopy == 0 ] = self.GC_PR_BGD
+                        
+                        cv.Dilate( motionImageCopy, motionImageCopy )
+                        cv.Dilate( motionImageCopy, motionImageCopy )
+                        cv.Dilate( motionImageCopy, motionImageCopy )
+                        cv.Dilate( motionImageCopy, motionImageCopy )
+                        workingMask[ motionImageCopy == 0 ] = self.GC_BGD
+                        
+                        print "Other seg"
+                        cv.GrabCut( imageCopy, workingMask, 
+                            (0,0,0,0), fgModel, bgModel, 12, self.GC_INIT_WITH_MASK )
+                        print "Other seg done"
+                            
+                        segmentation = np.copy( imageToSegment )
+                        segmentation[ (workingMask != self.GC_PR_FGD) & (workingMask != self.GC_FGD) ] = 0
+                    
+                        
+                        black = (workingMask != self.GC_PR_FGD) & (workingMask != self.GC_FGD)
+                        motionImage = np.where( black, 0, 255 ).astype( np.uint8 )
                     
                 
                 else:
@@ -770,6 +814,24 @@ class MainWindow:
                 
         if not self.workCancelled:
             self.refreshGraphDisplay()
+            
+            SAVE_MOTION_IMAGES = False
+            BASE_MOTION_IMAGE_NAME = self.scriptPath + "/../../test_data/motion_images/motion_{0:03}.png"
+            
+            if SAVE_MOTION_IMAGES and len( self.motionImageList ) > 0:
+                
+                width = self.motionImageList[ 0 ].shape[ 1 ]
+                height = self.motionImageList[ 0 ].shape[ 0 ]
+                colourImage = np.zeros( ( height, width, 3 ), dtype=np.uint8 )
+                
+                for frameIdx, motionImage in enumerate( self.motionImageList ):
+                    
+                    colourImage[ :, :, 0 ] = motionImage
+                    colourImage[ :, :, 1 ] = motionImage
+                    colourImage[ :, :, 2 ] = motionImage
+                    
+                    outputName = BASE_MOTION_IMAGE_NAME.format( frameIdx + 1 )
+                    cv.SaveImage( outputName, colourImage )
             
         print "Finished processing bag file"
         
