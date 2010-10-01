@@ -10,8 +10,8 @@ class ImageFlowFilter:
        combination of a rotation and translation by using a Sum of Square
        Differences (SSD) measure"""
     
-    TRANSLATION_STEP = 0.25
-    MAX_NUM_TRANSLATION_STEPS = 0.25
+    TRANSLATION_STEP = 1
+    MAX_NUM_TRANSLATION_STEPS = 3
     ROTATION_STEP_ANGLE = math.radians( 0.5 ) 
     MAX_NUM_ROTATION_STEPS = 10
 
@@ -25,15 +25,31 @@ class ImageFlowFilter:
         return self.lastImageGray
   
     #---------------------------------------------------------------------------
-    def calcImageFlow( self, curImageGray ):
+    def calcImageFlow( self, targetImageGray, templateImageGray=None ):
+        """Tries to move a template image to match a target image"""
         
-        curImageGray = scipy.ndimage.interpolation.zoom( 
-            np.array( curImageGray, dtype=np.int32 ), 0.25 )
+        targetImageGray = scipy.ndimage.interpolation.zoom( 
+            targetImageGray, 0.25 ).astype( np.int32 )
         
-        if self.lastImageGray == None:
-            lastImageGray = curImageGray
+        if templateImageGray == None:
+            
+            # Use the last image as the template if we have it
+            if self.lastImageGray == None:
+                templateImageGray = targetImageGray
+            else:
+                templateImageGray = self.lastImageGray
+        
         else:
-            lastImageGray = self.lastImageGray
+            templateImageGray = scipy.ndimage.interpolation.zoom( 
+                templateImageGray, 0.25 ).astype( np.int32 )
+        
+        # Save the current image
+        self.lastImageGray = targetImageGray
+        
+        return self.calcImageFlowInternal( targetImageGray, templateImageGray )
+            
+    #---------------------------------------------------------------------------
+    def calcImageFlowInternal( self, targetImageGray, templateImageGray ):
             
         transX = 0
         transY = 0
@@ -41,8 +57,8 @@ class ImageFlowFilter:
         rotationAngle = 0
         bestTransformedImage = None
         
-        imageWidth = lastImageGray.shape[ 1 ]
-        imageHeight = lastImageGray.shape[ 0 ]
+        imageWidth = templateImageGray.shape[ 1 ]
+        imageHeight = templateImageGray.shape[ 0 ]
         transformedImage = np.ndarray( ( imageHeight, imageWidth ), dtype=np.int32 )
         
         # Try all possible translations
@@ -55,7 +71,7 @@ class ImageFlowFilter:
             for yOffset in translationOffsetArray:
                 
                 scipy.ndimage.interpolation.shift( 
-                    lastImageGray, ( yOffset, xOffset ), output=transformedImage )
+                    templateImageGray, ( yOffset, xOffset ), output=transformedImage )
                 
                 #transformedImage.fill( 0 )
                 
@@ -72,7 +88,7 @@ class ImageFlowFilter:
                 #transformedImage[ dstY:dstHeight, dstX:dstWidth ] = \
                     #lastImageGray[ srcY:srcHeight, srcX:srcWidth ]
                     
-                transformSSD = np.sum( np.square( transformedImage - curImageGray ) )
+                transformSSD = np.sum( np.square( transformedImage - targetImageGray ) )
                 newTransDistance = math.sqrt( xOffset**2 + yOffset**2 )
                 
                 if minSSD == None \
@@ -84,12 +100,12 @@ class ImageFlowFilter:
                     transDistance = newTransDistance
                     bestTransformedImage = np.copy( transformedImage )
                     minSSD = transformSSD
-            
-        # Save the current image
-        self.lastImageGray = curImageGray
         
+        #newImage = bestTransformedImage
         newImage = np.array( 
-            scipy.ndimage.interpolation.zoom( bestTransformedImage, 4.0 ), dtype=np.uint8 )
-        newImage[ newImage > 0 ] = 255
+            scipy.ndimage.interpolation.zoom( bestTransformedImage.astype( np.uint8 ), 4.0 ) )
+        #newImage[ newImage > 255 ] = 255
+        #newImage = np.array( newImage, dtype=np.uint8 )
+        #newImage[ newImage > 0 ] = 255
         #cv.Dilate( newImage, newImage )
         return ( transX, transY, rotationAngle, newImage )

@@ -162,6 +162,7 @@ class OutputMode:
     DETECTED_MOTION = "Detected Motion"
     SEGMENTATION = "Segmentation"
     SALIENCY = "Saliency"
+    SEGMENTATION_MASK = "Segmentation Mask"
 
 #-------------------------------------------------------------------------------
 class MainWindow:
@@ -171,7 +172,7 @@ class MainWindow:
     OPTICAL_FLOW_RANGE_WIDTH = 8    # Range to look outside of a block for motion
     OPTICAL_FLOW_RANGE_HEIGHT = 8
     
-    PROCESSED_FRAME_DIFF = 3
+    PROCESSED_FRAME_DIFF = 1
     
     # Classes of pixel in GrabCut algorithm
     GC_BGD = 0      # background
@@ -269,6 +270,8 @@ class MainWindow:
                 self.dwgOutput_1_Display.setImageFromNumpyArray( self.segmentationList[ self.frameIdx ] )
             elif output_1_Mode == OutputMode.SALIENCY:
                 self.dwgOutput_1_Display.setImageFromNumpyArray( self.saliencyMapList[ self.frameIdx ] )
+            elif output_1_Mode == OutputMode.SEGMENTATION_MASK:
+                self.dwgOutput_1_Display.setImageFromNumpyArray( self.segmentationMaskList[ self.frameIdx ] )
                 
             output_2_Mode = self.comboOutput_2_Mode.get_active_text()
             if output_2_Mode == OutputMode.OPTICAL_FLOW:
@@ -285,6 +288,8 @@ class MainWindow:
                 self.dwgOutput_2_Display.setImageFromNumpyArray( self.segmentationList[ self.frameIdx ] )
             elif output_2_Mode == OutputMode.SALIENCY:
                 self.dwgOutput_2_Display.setImageFromNumpyArray( self.saliencyMapList[ self.frameIdx ] )
+            elif output_2_Mode == OutputMode.SEGMENTATION_MASK:
+                self.dwgOutput_2_Display.setImageFromNumpyArray( self.segmentationMaskList[ self.frameIdx ] )
         
     #---------------------------------------------------------------------------
     def chooseBagFile( self ):
@@ -458,8 +463,10 @@ class MainWindow:
         self.opticalFlowListX = [ None for i in range( numFrames ) ]
         self.opticalFlowListY = [ None for i in range( numFrames ) ]
         self.segmentationList = [ None for i in range( numFrames ) ]
+        self.segmentationMaskList = [ None for i in range( numFrames ) ]
         self.imageFlowList = [ ( 0, 0, 0, None ) for i in range( numFrames ) ]
         self.maxMotionCounts = [ 0 for i in range( numFrames ) ]
+        self.leftMostMotionList = [ 0 for i in range( numFrames ) ]
         self.saliencyMapList = [ None for i in range( numFrames ) ]
         self.saliencyClusterList = [ [] for i in range( numFrames ) ]
         self.numFramesProcessed = 0
@@ -477,6 +484,7 @@ class MainWindow:
     
         bagFrameIdx = 0
         frameIdx = 0
+        impactFrameIdx = None
         
         # Setup filters
         opticalFlowFilter = OpticalFlowFilter(
@@ -518,18 +526,72 @@ class MainWindow:
                 # Detect motion
                 motionImage = motionDetectionFilter.calcMotion( grayImage )
                 
+                # Work out the left most point in the image where motion appears
+                motionTest = np.copy( motionImage )
+                cv.Erode( motionTest, motionTest )
+                if frameIdx == 0:
+                    leftMostMotion = motionImage.shape[ 1 ]
+                else:
+                    leftMostMotion = self.leftMostMotionList[ frameIdx - 1 ]
+                
+                leftMostMotionDiff = 0
+                for i in range( leftMostMotion ):
+                    if motionTest[ :, i ].max() > 0:
+                        leftMostMotionDiff = abs( leftMostMotion - i )
+                        leftMostMotion = i
+                        break
+                
+                segmentationMask = np.zeros( ( msg.height, msg.width ), dtype=np.uint8 )
+                
+                if impactFrameIdx == None:        
+                    if leftMostMotionDiff > 18 and leftMostMotion < 0.75*msg.width:
+                        
+                        # Found impact frame
+                        impactFrameIdx = frameIdx
+                    
+                else:
+                    if frameIdx - impactFrameIdx == 2:
+                        
+                        # Should now have enough info to segment object
+                        impactMotionImage = self.motionImageList[ impactFrameIdx ]
+                        
+                        postImpactFarFlow = imageFlowFilter.calcImageFlow( impactMotionImage, motionImage )
+                        postImpactNearFlow = imageFlowFilter.calcImageFlow( impactMotionImage, self.motionImageList[ impactFrameIdx + 1 ] )
+                        
+                        segmentationMask = np.maximum( np.maximum( 
+                            impactMotionImage, postImpactNearFlow[ 3 ] ), postImpactFarFlow[ 3 ] )
+                        cv.Dilate( segmentationMask, segmentationMask )
+                        
+                        preImpactRealFarFlow = imageFlowFilter.calcImageFlow( impactMotionImage, self.motionImageList[ impactFrameIdx - 3 ] )
+                        preImpactFarFlow = imageFlowFilter.calcImageFlow( impactMotionImage, self.motionImageList[ impactFrameIdx - 2 ] )
+                        preImpactNearFlow = imageFlowFilter.calcImageFlow( impactMotionImage, self.motionImageList[ impactFrameIdx - 1 ] )
+                        
+                        subMask = np.maximum( np.maximum( 
+                            preImpactRealFarFlow[ 3 ], preImpactFarFlow[ 3 ] ), preImpactNearFlow[ 3 ] )
+                        cv.Dilate( subMask, subMask )
+                            
+                        diffImage = np.array( segmentationMask, dtype=np.int32 ) \
+                            - np.array( subMask, dtype=np.int32 )
+                        diffImage = np.array( np.maximum( diffImage, 0 ), dtype=np.uint8 )
+                        segmentationMask = np.where( diffImage > 128, 255, 0 ).astype( np.uint8 )
+                
                 # Calculate image flow
-                imageFlow = imageFlowFilter.calcImageFlow( motionImage )
+                #imageFlow = imageFlowFilter.calcImageFlow( motionImage )
                 
-                # Calculate saliency map
-                saliencyMap, largeSaliencyMap = residualSaliencyFilter.calcSaliencyMap( grayImageNumpPy )
+                ## Calculate saliency map
+                #saliencyMap, largeSaliencyMap = residualSaliencyFilter.calcSaliencyMap( grayImageNumpPy )
                 
-                blobMap = np.where( largeSaliencyMap > 128, 255, 0 ).astype( np.uint8 )
+                #blobMap = np.where( largeSaliencyMap > 128, 255, 0 ).astype( np.uint8 )
                 
-                blobMap, numBlobs = PyBlobLib.labelBlobs( blobMap )
-                print "found", numBlobs, "blobs"
+                #blobMap, numBlobs = PyBlobLib.labelBlobs( blobMap )
+                #print "found", numBlobs, "blobs"
                 
-                largeSaliencyMap = np.where( largeSaliencyMap > 128, 255, 0 ).astype( np.uint8 )
+                #largeSaliencyMap = np.where( largeSaliencyMap > 128, 255, 0 ).astype( np.uint8 )
+                
+                
+                
+                
+                
                 
                 # Threshold the saliency map
                 #largeSaliencyMap = (largeSaliencyMap > 128).astype(np.uint8) * 255
@@ -576,26 +638,33 @@ class MainWindow:
                     
                     #clusterList.append( ( mean, stdDev ) )
                 
+                
+                
+                
                 # Work out the maximum amount of motion we've seen in a single frame so far
-                motionCount = motionImage[ motionImage > 0 ].size
+                #motionCount = motionImage[ motionImage > 0 ].size
                 
-                if frameIdx == 0:
-                    lastMotionCount = 0
-                else:
-                    lastMotionCount = self.maxMotionCounts[ frameIdx - 1 ]
+                #if frameIdx == 0:
+                    #lastMotionCount = 0
+                #else:
+                    #lastMotionCount = self.maxMotionCounts[ frameIdx - 1 ]
                     
-                if motionCount < lastMotionCount:
-                    motionCount = lastMotionCount
+                #if motionCount < lastMotionCount:
+                    #motionCount = lastMotionCount
                 
-                # Work out diffImage    
-                diffImage = np.array( motionImage, dtype=np.int32 ) \
-                     - np.array( imageFlow[ 3 ], dtype=np.int32 )
-                diffImage = np.array( np.maximum( diffImage, 0 ), dtype=np.uint8 )
+                ## Work out diffImage    
+                #diffImage = np.array( motionImage, dtype=np.int32 ) \
+                     #- np.array( imageFlow[ 3 ], dtype=np.int32 )
+                #diffImage = np.array( np.maximum( diffImage, 0 ), dtype=np.uint8 )
+                
+                
+                
                 
                 
                 # Segment the image
                 #workingMask = np.copy( motionImage )
-                workingMask = np.copy( diffImage )
+                #workingMask = np.copy( diffImage )
+                workingMask = np.copy( segmentationMask )
                 kernel = cv.CreateStructuringElementEx( 
                     cols=3, rows=3, 
                     anchorX=1, anchorY=1, shape=cv.CV_SHAPE_CROSS )
@@ -673,6 +742,11 @@ class MainWindow:
                     segmentation = np.copy( image )
                     segmentation[ (workingMask != self.GC_PR_FGD) & (workingMask != self.GC_FGD) ] = 0
                 
+                    
+                    black = (workingMask != self.GC_PR_FGD) & (workingMask != self.GC_FGD)
+                    motionImage = np.where( black, 0, 255 ).astype( np.uint8 )
+                    
+                
                 else:
                     segmentation = np.zeros( ( image.height, image.width ), dtype=np.uint8 )
                 
@@ -684,10 +758,12 @@ class MainWindow:
                 self.opticalFlowListY[ frameIdx ] = opticalFlowArrayY
                 self.motionImageList[ frameIdx ] = motionImage
                 self.segmentationList[ frameIdx ] = segmentation
-                self.maxMotionCounts[ frameIdx ] = motionCount
-                self.imageFlowList[ frameIdx ] = imageFlow
-                self.saliencyMapList[ frameIdx ] = largeSaliencyMap
-                self.saliencyClusterList[ frameIdx ] = clusterList
+                self.segmentationMaskList[ frameIdx ] = segmentationMask
+                #self.maxMotionCounts[ frameIdx ] = motionCount
+                #self.imageFlowList[ frameIdx ] = imageFlow
+                #self.saliencyMapList[ frameIdx ] = largeSaliencyMap
+                #self.saliencyClusterList[ frameIdx ] = clusterList
+                self.leftMostMotionList[ frameIdx ] = leftMostMotion
                 
                 frameIdx += 1
                 self.numFramesProcessed += 1
@@ -713,7 +789,10 @@ class MainWindow:
         # Draw the graphs
         self.graphFigure = Figure( figsize=(8,6), dpi=72 )
         self.graphAxis = self.graphFigure.add_subplot( 111 )
-        self.graphAxis.plot( range( 1, len( self.maxMotionCounts )+1 ), self.maxMotionCounts )
+        #self.graphAxis.plot( range( 1, len( self.maxMotionCounts )+1 ), self.maxMotionCounts )
+        diffs = [ 0 ] + [ self.leftMostMotionList[ i+1 ] - self.leftMostMotionList[ i ] for i in range( len( self.leftMostMotionList ) - 1 ) ]
+        #self.graphAxis.plot( range( 1, len( self.leftMostMotionList )+1 ), self.leftMostMotionList )
+        self.graphAxis.plot( range( 1, len( self.leftMostMotionList )+1 ), diffs )
         
         # Build the new graph display
         self.graphCanvas = FigureCanvas( self.graphFigure ) # a gtk.DrawingArea
