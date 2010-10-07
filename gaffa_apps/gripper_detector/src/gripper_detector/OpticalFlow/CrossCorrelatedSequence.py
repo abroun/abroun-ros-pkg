@@ -85,14 +85,14 @@ class CrossCorrelatedSequence:
     #---------------------------------------------------------------------------      
     def detectInputSequence( self, threshold ):
         
-        inputSignalDetectedArray = False
-        
-        # Check each of the maximum correlation coefficients against the
-        # threshold. If they're greater than or equal then the input sequence
-        # is detected in that block
-        for maxCorrelationArray in self.maxAbsCorrelations:
-            inputSignalDetectedArray = np.logical_or(
-                maxCorrelationArray >= threshold,
-                inputSignalDetectedArray )
-            
+        inputSignalDetectedArray = self.getBlockScores() >= threshold
         return inputSignalDetectedArray
+        
+    #---------------------------------------------------------------------------      
+    def getBlockScores( self ):
+        
+        blockScores = 0
+        for maxCorrelationArray in self.maxAbsCorrelations:
+            blockScores = np.maximum( blockScores, maxCorrelationArray )
+        
+        return blockScores

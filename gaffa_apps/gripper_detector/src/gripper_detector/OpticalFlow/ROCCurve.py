@@ -1,4 +1,10 @@
 
+#
+# Uses algorithms from 
+#   [Fawcett06] An introduction to ROC analysis by Tom Fawcett
+
+#
+
 import numpy as np
 
 #-------------------------------------------------------------------------------
@@ -8,22 +14,14 @@ class ROCCurve:
     DEFAULT_THRESHOLD_STEP_SIZE = 0.01
     
     #---------------------------------------------------------------------------
-    def __init__( self, thresholdStepSize = None ):
-        
-        if thresholdStepSize == None:
-            thresholdStepSize = self.DEFAULT_THRESHOLD_STEP_SIZE
+    def __init__( self ):
             
-        self.thresholdStepSize = thresholdStepSize
         self.truePositiveRates = []
         self.falsePositiveRates = []
         self.sensitivity = self.truePositiveRates
         self.specificity = []
         self.accuracy = []
-        
-    #---------------------------------------------------------------------------
-    def calculateThresholds( self ):
-        
-        return np.arange( 0.0, 1.0 + self.thresholdStepSize, self.thresholdStepSize )
+        self.score = []
         
     #---------------------------------------------------------------------------
     @staticmethod
@@ -40,7 +38,7 @@ class ROCCurve:
         avgROCCurve = ROCCurve( thresholdStepSize )
         varianceROCCurve = ROCCurve( thresholdStepSize )
         
-        thresholds = curveList[ 0 ].calculateThresholds()
+        thresholds = curveList[ 0 ].thresholds
         for thresholdIdx in range( len( thresholds ) ):
             
             # Calculate average for threshold
@@ -95,46 +93,55 @@ class GripperDetectorROCCurve( ROCCurve ):
     '''The ROC curve for the gripper detector classifier'''
     
     #---------------------------------------------------------------------------
-    def __init__( self, crossCorrelatedSequence, markerBuffer, thresholdStepSize = None ):
-        ROCCurve.__init__( self, thresholdStepSize )
+    def __init__( self, crossCorrelatedSequence, markerBuffer ):
+        ROCCurve.__init__( self )
         
-        positiveNegativeCounts = np.bincount( markerBuffer.flat )
+        # Get the maximum cross correlation value from each optical flow block
+        flatBlockScores = crossCorrelatedSequence.getBlockScores()
+        
+        # The marker buffer matches the block scores one to one and gives the
+        # ground truth of whether the block is part of the gripper or not
+        flatMarkerBuffer = markerBuffer.flat
+        positiveNegativeCounts = np.bincount( flatMarkerBuffer )
         actualNegativeCount = positiveNegativeCounts[ 0 ]
         actualPositiveCount = positiveNegativeCounts[ 1 ]
         totalSampleCount = actualNegativeCount + actualPositiveCount
         
-        thresholds = self.calculateThresholds()
+        # Build the ROC curve using the algorithm given in Fawcett06
         
-        # Calculate the true positive rate and false positive rate for each
-        # threshold value
-        for threshold in thresholds:
-                        
-            inputSignalDetectedArray = \
-                crossCorrelatedSequence.detectInputSequence( threshold )
-            
-            numTruePositives = 0
-            numTrueNegatives = 0
-            numFalsePositives = 0
-            
-            for rowIdx in range( markerBuffer.shape[ 0 ] ):
-                for colIdx in range( markerBuffer.shape[ 1 ] ):
-                    
-                    if inputSignalDetectedArray[ rowIdx, colIdx ]:
-                        
-                        if markerBuffer[ rowIdx, colIdx ]:
-                            numTruePositives += 1
-                        else:
-                            numFalsePositives += 1
-                    
-                    else:
-                        
-                        if not markerBuffer[ rowIdx, colIdx ]:
-                            numTrueNegatives += 1
-                        
+        # Get indices that are ordered so that the block scores are sorted from
+        # high to low
+        sortedIndices = np.flipud( np.argsort( flatBlockScores ) )
         
-            truePositiveRate = float( numTruePositives ) / float( actualPositiveCount )
-            falsePositiveRate = float( numFalsePositives ) / float( actualNegativeCount )
-            self.truePositiveRates.append( truePositiveRate )
-            self.falsePositiveRates.append( falsePositiveRate )
-            self.specificity.append( 1.0 - falsePositiveRate )
-            self.accuracy.append( float(numTruePositives + numTrueNegatives)/totalSampleCount )
+        numTruePositives = 0
+        numFalsePositives = 0
+        numTrueNegatives = 0
+        lastScore = None
+        
+        for i in range( len( flatBlockScores ) ):
+            
+            score = flatBlockScores[ sortedIndices[ i ] ]
+            if score != lastScore:
+                
+                # New ROC point
+                truePositiveRate = float( numTruePositives ) / float( actualPositiveCount )
+                falsePositiveRate = float( numFalsePositives ) / float( actualNegativeCount )
+                self.truePositiveRates.append( truePositiveRate )
+                self.falsePositiveRates.append( falsePositiveRate )
+                self.specificity.append( 1.0 - falsePositiveRate )
+                self.accuracy.append( float(numTruePositives + numTrueNegatives)/totalSampleCount )
+                self.scores.append( score )
+                
+                lastScore = score
+        
+            if flatMarkerBuffer[ sortedIndices[ i ] ] == True:
+                numTruePositives += 1
+            else:
+                numFalsePositives += 1
+                
+        # Make sure that we have an end point for the threshold that lets everything through
+        self.truePositiveRates.append( 1.0 )
+        self.falsePositiveRates.append( 1.0 )
+        self.specificity.append( 0.0 )
+        self.accuracy.append( float(numTruePositives + numTrueNegatives)/totalSampleCount )
+        self.scores.append( 0.0 )
