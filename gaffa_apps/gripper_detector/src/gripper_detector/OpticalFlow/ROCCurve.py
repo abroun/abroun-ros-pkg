@@ -8,6 +8,17 @@
 import numpy as np
 
 #-------------------------------------------------------------------------------
+class ROCValues:
+    '''Values for the ROC curve at a particular FPR'''
+    
+    #---------------------------------------------------------------------------
+    def __init__( self, truePositiveRate, accuracy, score ):
+        
+        self.truePositiveRate = truePositiveRate
+        self.accuracy = accuracy
+        self.score = score
+
+#-------------------------------------------------------------------------------
 class ROCCurve:
     '''The ROC curve for a classifier run'''
     
@@ -21,68 +32,95 @@ class ROCCurve:
         self.sensitivity = self.truePositiveRates
         self.specificity = []
         self.accuracy = []
-        self.score = []
+        self.scores = []
+        self.areaUnderCurve = 0
+
+    #---------------------------------------------------------------------------
+    def getROCValuesForFPR( self, fpr ):
         
+        i = -1
+        numPoints = len( self.truePositiveRates )
+        
+        while i < numPoints - 1 \
+            and self.falsePositiveRates[ i + 1 ] <= fpr:
+            
+            i += 1
+            
+        if i < 0:
+            # No values found
+            return None
+        elif self.falsePositiveRates[ i ] == fpr:
+            # Exact match found
+            return ROCValues( self.truePositiveRates[ i ], self.accuracy[ i ], self.scores[ i ] )
+        else:
+            # Return an interpolated set of values
+            fprDiff = self.falsePositiveRates[ i + 1 ] - self.falsePositiveRates[ i ]
+            tprSlope = (self.truePositiveRates[ i + 1 ] - self.truePositiveRates[ i ])/fprDiff
+            accuracySlope = (self.accuracy[ i + 1 ] - self.accuracy[ i ])/fprDiff
+            scoreSlope = (self.scores[ i + 1 ] - self.scores[ i ])/fprDiff
+            
+            interpDiff = fpr - self.falsePositiveRates[ i ]
+            
+            return ROCValues( 
+                self.truePositiveRates[ i ] + interpDiff*tprSlope, 
+                self.accuracy[ i ] + interpDiff*accuracySlope, 
+                self.scores[ i ] + interpDiff*scoreSlope )
+
     #---------------------------------------------------------------------------
     @staticmethod
-    def averageROCCurves( curveList ):
+    def trapezoidArea( x1, x2, y1, y2 ):
+            base = abs( x1 - x2 )
+            averageHeight = float( y1 + y2 )/2.0
+            return base*averageHeight
+            
+    #---------------------------------------------------------------------------
+    @staticmethod
+    def averageROCCurves( curveList, numSteps = 10 ):
         
         numCurves = len( curveList )
         assert numCurves > 0
         
-        thresholdStepSize = curveList[ 0 ].thresholdStepSize
-        for curveIdx in range( 1, numCurves ):
-            if curveList[ curveIdx ].thresholdStepSize != thresholdStepSize:
-                raise Exception( "The threshold step size must be the same for all ROC curves" )
+        #thresholdStepSize = curveList[ 0 ].thresholdStepSize
+        #for curveIdx in range( 1, numCurves ):
+        #    if curveList[ curveIdx ].thresholdStepSize != thresholdStepSize:
+        #        raise Exception( "The threshold step size must be the same for all ROC curves" )
             
-        avgROCCurve = ROCCurve( thresholdStepSize )
-        varianceROCCurve = ROCCurve( thresholdStepSize )
+        avgROCCurve = ROCCurve()
+        varianceROCCurve = ROCCurve()
         
-        thresholds = curveList[ 0 ].thresholds
-        for thresholdIdx in range( len( thresholds ) ):
+        fprThresholdStepSize = 1.0 / numSteps
+        avgROCCurve.falsePositiveRates = np.arange( 0.0, 1.0 + fprThresholdStepSize, fprThresholdStepSize )
+        avgROCCurve.specificity = np.flipud( avgROCCurve.falsePositiveRates )
+        varianceROCCurve.falsePositiveRates = np.arange( 0.0, 1.0 + fprThresholdStepSize, fprThresholdStepSize )
+        varianceROCCurve.specificity = np.flipud( varianceROCCurve.falsePositiveRates )
+        
+        valueList = [ [ curveList[ curveIdx ].getROCValuesForFPR( fpr ) \
+            for curveIdx in range( numCurves ) ] for fpr in avgROCCurve.falsePositiveRates ]
+        
+        for i in range( len( avgROCCurve.falsePositiveRates ) ):
             
-            # Calculate average for threshold
-            avgTruePositiveRate = 0
-            avgFalsePositiveRate = 0
-            avgSpecificity = 0
-            avgAccuracy = 0
-            for curve in curveList:
-                
-                avgTruePositiveRate += curve.truePositiveRates[ thresholdIdx ]
-                avgFalsePositiveRate += curve.falsePositiveRates[ thresholdIdx ]
-                avgSpecificity += curve.specificity[ thresholdIdx ]
-                avgAccuracy += curve.accuracy[ thresholdIdx ]    
-                
-            avgTruePositiveRate /= numCurves
-            avgFalsePositiveRate /= numCurves
-            avgSpecificity /= numCurves
-            avgAccuracy /= numCurves
+            # Calculate average for FPR threshold            
+            tprList = [ valueList[ i ][ curveIdx ].truePositiveRate for curveIdx in range( numCurves ) ]
+            accuracyList = [ valueList[ i ][ curveIdx ].accuracy for curveIdx in range( numCurves ) ]
+            
+            avgTruePositiveRate = sum( tprList )/numCurves
+            avgAccuracy = sum( accuracyList )/numCurves
             
             avgROCCurve.truePositiveRates.append( avgTruePositiveRate )
-            avgROCCurve.falsePositiveRates.append( avgFalsePositiveRate )
-            avgROCCurve.specificity.append( avgSpecificity )
             avgROCCurve.accuracy.append( avgAccuracy )
  
             # Also calculate variance
-            varianceTruePositiveRate = 0
-            varianceFalsePositiveRate = 0
-            varianceSpecificity = 0
-            varianceAccuracy = 0
-            for curve in curveList:
-                
-                varianceTruePositiveRate += (curve.truePositiveRates[ thresholdIdx ] - avgTruePositiveRate)**2
-                varianceFalsePositiveRate += (curve.falsePositiveRates[ thresholdIdx ] - avgFalsePositiveRate)**2
-                varianceSpecificity += (curve.specificity[ thresholdIdx ] - avgSpecificity)**2
-                varianceAccuracy += (curve.accuracy[ thresholdIdx ] - avgAccuracy)**2
-                
-            varianceTruePositiveRate /= numCurves
-            varianceFalsePositiveRate /= numCurves
-            varianceSpecificity /= numCurves
-            varianceAccuracy /= numCurves
+            tprSquaredDiffList = [ 
+                (valueList[ i ][ curveIdx ].truePositiveRate - avgTruePositiveRate)**2 \
+                for curveIdx in range( numCurves ) ]
+            accuracySquaredDiffList = [ 
+                (valueList[ i ][ curveIdx ].accuracy - avgAccuracy)**2 \
+                for curveIdx in range( numCurves ) ]
+            
+            varianceTruePositiveRate = sum( tprSquaredDiffList )/numCurves
+            varianceAccuracy = sum( accuracySquaredDiffList )/numCurves
             
             varianceROCCurve.truePositiveRates.append( varianceTruePositiveRate )
-            varianceROCCurve.falsePositiveRates.append( varianceFalsePositiveRate )
-            varianceROCCurve.specificity.append( varianceSpecificity )
             varianceROCCurve.accuracy.append( varianceAccuracy )
         
         return (avgROCCurve, varianceROCCurve)
@@ -97,7 +135,7 @@ class GripperDetectorROCCurve( ROCCurve ):
         ROCCurve.__init__( self )
         
         # Get the maximum cross correlation value from each optical flow block
-        flatBlockScores = crossCorrelatedSequence.getBlockScores()
+        flatBlockScores = crossCorrelatedSequence.getBlockScores().flat
         
         # The marker buffer matches the block scores one to one and gives the
         # ground truth of whether the block is part of the gripper or not
@@ -116,29 +154,47 @@ class GripperDetectorROCCurve( ROCCurve ):
         numTruePositives = 0
         numFalsePositives = 0
         numTrueNegatives = 0
-        lastScore = None
+        
+        prevScore = None
+        prevNumTruePositives = 0
+        prevNumFalsePositives = 0
         
         for i in range( len( flatBlockScores ) ):
             
             score = flatBlockScores[ sortedIndices[ i ] ]
-            if score != lastScore:
+            #if score != prevScore:
+            
+            if score <= 0.5:
+                break
                 
-                # New ROC point
-                truePositiveRate = float( numTruePositives ) / float( actualPositiveCount )
-                falsePositiveRate = float( numFalsePositives ) / float( actualNegativeCount )
-                self.truePositiveRates.append( truePositiveRate )
-                self.falsePositiveRates.append( falsePositiveRate )
-                self.specificity.append( 1.0 - falsePositiveRate )
-                self.accuracy.append( float(numTruePositives + numTrueNegatives)/totalSampleCount )
-                self.scores.append( score )
-                
-                lastScore = score
+            # New ROC point
+            truePositiveRate = float( numTruePositives ) / float( actualPositiveCount )
+            falsePositiveRate = float( numFalsePositives ) / float( actualNegativeCount )
+            self.truePositiveRates.append( truePositiveRate )
+            self.falsePositiveRates.append( falsePositiveRate )
+            self.specificity.append( 1.0 - falsePositiveRate )
+            self.accuracy.append( float(numTruePositives + numTrueNegatives)/totalSampleCount )
+            self.scores.append( score )
+            
+            self.areaUnderCurve += self.trapezoidArea( 
+                numFalsePositives, prevNumFalsePositives,
+                numTruePositives, prevNumTruePositives )
+            
+            prevScore = score
+            prevNumTruePositives = numTruePositives
+            prevNumFalsePositives = numFalsePositives
         
             if flatMarkerBuffer[ sortedIndices[ i ] ] == True:
                 numTruePositives += 1
             else:
                 numFalsePositives += 1
                 
+        # Finish calculating the AUC
+        self.areaUnderCurve += self.trapezoidArea( 
+            actualNegativeCount, prevNumFalsePositives,
+            actualPositiveCount, prevNumTruePositives )
+        self.areaUnderCurve /= ( actualNegativeCount*actualPositiveCount )  # Scale to the unit square
+                    
         # Make sure that we have an end point for the threshold that lets everything through
         self.truePositiveRates.append( 1.0 )
         self.falsePositiveRates.append( 1.0 )

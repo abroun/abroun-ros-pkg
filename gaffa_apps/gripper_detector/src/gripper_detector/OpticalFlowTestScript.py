@@ -135,26 +135,31 @@ axisROC.plot( averageROCCurve.falsePositiveRates, averageROCCurve.truePositiveRa
 # Add error bars
 if varianceROCCurve != None:
     
-    diffBetweenErrorBars = 0.05 #1.0/(NUM_ERROR_BARS)
-    lastFPRValue = averageROCCurve.falsePositiveRates[ 0 ]
+    #diffBetweenErrorBars = 0.05 #1.0/(NUM_ERROR_BARS)
+    #lastFPRValue = averageROCCurve.falsePositiveRates[ 0 ]
     
-    errorFPR = []
-    errorTPR = []
-    errorErrFPR = []
-    errorErrTPR = []
-    for i in range( len( averageROCCurve.falsePositiveRates ) ):
+    #errorFPR = []
+    #errorTPR = []
+    #errorErrFPR = []
+    #errorErrTPR = []
+    #for i in range( len( averageROCCurve.falsePositiveRates ) ):
         
-        curFPRValue = averageROCCurve.falsePositiveRates[ i ]
-        if abs( curFPRValue - lastFPRValue ) >= diffBetweenErrorBars:
-            lastFPRValue = curFPRValue
+        #curFPRValue = averageROCCurve.falsePositiveRates[ i ]
+        #if abs( curFPRValue - lastFPRValue ) >= diffBetweenErrorBars:
+            #lastFPRValue = curFPRValue
         
-            errorFPR.append( averageROCCurve.falsePositiveRates[ i ] )
-            errorTPR.append( averageROCCurve.truePositiveRates[ i ] )
-            errorErrFPR.append( math.sqrt( varianceROCCurve.falsePositiveRates[ i ] )*2.571 )
-            errorErrTPR.append( math.sqrt( varianceROCCurve.truePositiveRates[ i ] )*2.571 )
+            #errorFPR.append( averageROCCurve.falsePositiveRates[ i ] )
+            #errorTPR.append( averageROCCurve.truePositiveRates[ i ] )
+            #errorErrFPR.append( math.sqrt( varianceROCCurve.falsePositiveRates[ i ] )*2.571 )
+            #errorErrTPR.append( math.sqrt( varianceROCCurve.truePositiveRates[ i ] )*2.571 )
             
-    axisROC.errorbar( errorFPR, errorTPR, 
-        xerr=errorErrFPR, yerr=errorErrTPR, linestyle='None' )
+    #axisROC.errorbar( errorFPR, errorTPR, 
+        #xerr=errorErrFPR, yerr=errorErrTPR, linestyle='None' )
+        
+    errorList = [ math.sqrt( v )*2.571 for v in varianceROCCurve.truePositiveRates ]
+        
+    axisROC.errorbar( averageROCCurve.falsePositiveRates, averageROCCurve.truePositiveRates, 
+        yerr=errorList, linestyle='None' )
         
     #print errorFPR
     #print errorTPR
@@ -163,41 +168,44 @@ if varianceROCCurve != None:
 axisROC.set_xlim( 0.0, 1.0 )
 axisROC.set_ylim( 0.0, 1.0 )
 
+for i in range( len( averageROCCurve.falsePositiveRates ) ):
+    print averageROCCurve.falsePositiveRates[ i ], averageROCCurve.truePositiveRates[ i ], averageROCCurve.scores[ i ]
+
 # Plot accuracy
-figureAccuracy = Figure( figsize=(8,6), dpi=72 )
-canvasAccuracy = FigureCanvas( figureAccuracy )
-axisAccuracy = figureAccuracy.add_subplot( 111 )
+#figureAccuracy = Figure( figsize=(8,6), dpi=72 )
+#canvasAccuracy = FigureCanvas( figureAccuracy )
+#axisAccuracy = figureAccuracy.add_subplot( 111 )
 
-thresholds = averageROCCurve.calculateThresholds()
-axisAccuracy.plot( thresholds, averageROCCurve.accuracy )
+#thresholds = averageROCCurve.calculateThresholds()
+#axisAccuracy.plot( thresholds, averageROCCurve.accuracy )
 
-#for data in dataList:
-#    axisAccuracy.plot( thresholds, data.rocCurve.accuracy )
+##for data in dataList:
+##    axisAccuracy.plot( thresholds, data.rocCurve.accuracy )
 
-# Add error bars
-if varianceROCCurve != None:
+## Add error bars
+#if varianceROCCurve != None:
     
-    diffBetweenErrorBars = 1.0/(NUM_ERROR_BARS)
-    lastThresholdValue = thresholds[ 0 ]
+    #diffBetweenErrorBars = 1.0/(NUM_ERROR_BARS)
+    #lastThresholdValue = thresholds[ 0 ]
     
-    errorThreshold = []
-    errorAccuracy = []
-    errorErrAccuracy = []
-    for i in range( len( thresholds ) ):
+    #errorThreshold = []
+    #errorAccuracy = []
+    #errorErrAccuracy = []
+    #for i in range( len( thresholds ) ):
         
-        curThresholdValue = thresholds[ i ]
-        if abs( curThresholdValue - lastThresholdValue ) >= diffBetweenErrorBars:
-            lastThresholdValue = curThresholdValue
+        #curThresholdValue = thresholds[ i ]
+        #if abs( curThresholdValue - lastThresholdValue ) >= diffBetweenErrorBars:
+            #lastThresholdValue = curThresholdValue
         
-            errorThreshold.append( curThresholdValue )
-            errorAccuracy.append( averageROCCurve.accuracy[ i ] )
-            errorErrAccuracy.append( math.sqrt( varianceROCCurve.accuracy[ i ] )*2.571 )
+            #errorThreshold.append( curThresholdValue )
+            #errorAccuracy.append( averageROCCurve.accuracy[ i ] )
+            #errorErrAccuracy.append( math.sqrt( varianceROCCurve.accuracy[ i ] )*2.571 )
           
-    axisAccuracy.errorbar( errorThreshold, errorAccuracy, yerr=errorErrAccuracy, linestyle='None' )
+    #axisAccuracy.errorbar( errorThreshold, errorAccuracy, yerr=errorErrAccuracy, linestyle='None' )
 
 # Save the graphs
 figureROC.savefig( options.outputPrefix + "ROC.png" )
-figureAccuracy.savefig( options.outputPrefix + "Accuracy.png" )
+#figureAccuracy.savefig( options.outputPrefix + "Accuracy.png" )
         
 
  
