@@ -163,33 +163,18 @@ class GripperDetectorROCCurve( ROCCurve ):
         
         numTruePositives = 0
         numFalsePositives = 0
-        numTrueNegatives = 0
         
         prevScore = 1.0
         prevNumTruePositives = 0
         prevNumFalsePositives = 0
-        
-        #maxScore = score = flatBlockScores[ sortedIndices[ 0 ] ]
-        #if maxScore < 1.0 - 0.001:
-            #self.truePositiveRates.append( 0.0 )
-            #self.falsePositiveRates.append( 0.0 )
-            #self.specificity.append( 1.0 )
-            #self.accuracy.append( float(numTruePositives + numTrueNegatives)/totalSampleCount )
-            #self.scores.append( 1.0 )
-            
-            #self.truePositiveRates.append( 0.0 )
-            #self.falsePositiveRates.append( 0.0 )
-            #self.specificity.append( 1.0 )
-            #self.accuracy.append( float(numTruePositives + numTrueNegatives)/totalSampleCount )
-            #self.scores.append( maxScore + 0.001 )
-            
-            #print self.scores
         
         for i in range( len( flatBlockScores ) ):
             
             score = flatBlockScores[ sortedIndices[ i ] ]
             
             if prevScore != score:
+
+                numTrueNegatives = actualNegativeCount - numFalsePositives
 
                 # New ROC point
                 truePositiveRate = float( numTruePositives ) / float( actualPositiveCount )
