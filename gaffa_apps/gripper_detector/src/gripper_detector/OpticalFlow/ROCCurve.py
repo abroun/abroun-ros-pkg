@@ -162,27 +162,28 @@ class GripperDetectorROCCurve( ROCCurve ):
         for i in range( len( flatBlockScores ) ):
             
             score = flatBlockScores[ sortedIndices[ i ] ]
-            #if score != prevScore:
             
-            if score <= 0.5:
-                break
+            #if score <= 0.5:
+            #    break
+            
+            if prevScore == None or abs( score - prevScore ) > 0.00001:
+
+                # New ROC point
+                truePositiveRate = float( numTruePositives ) / float( actualPositiveCount )
+                falsePositiveRate = float( numFalsePositives ) / float( actualNegativeCount )
+                self.truePositiveRates.append( truePositiveRate )
+                self.falsePositiveRates.append( falsePositiveRate )
+                self.specificity.append( 1.0 - falsePositiveRate )
+                self.accuracy.append( float(numTruePositives + numTrueNegatives)/totalSampleCount )
+                self.scores.append( score )
                 
-            # New ROC point
-            truePositiveRate = float( numTruePositives ) / float( actualPositiveCount )
-            falsePositiveRate = float( numFalsePositives ) / float( actualNegativeCount )
-            self.truePositiveRates.append( truePositiveRate )
-            self.falsePositiveRates.append( falsePositiveRate )
-            self.specificity.append( 1.0 - falsePositiveRate )
-            self.accuracy.append( float(numTruePositives + numTrueNegatives)/totalSampleCount )
-            self.scores.append( score )
-            
-            self.areaUnderCurve += self.trapezoidArea( 
-                numFalsePositives, prevNumFalsePositives,
-                numTruePositives, prevNumTruePositives )
-            
-            prevScore = score
-            prevNumTruePositives = numTruePositives
-            prevNumFalsePositives = numFalsePositives
+                self.areaUnderCurve += self.trapezoidArea( 
+                    numFalsePositives, prevNumFalsePositives,
+                    numTruePositives, prevNumTruePositives )
+                
+                prevScore = score
+                prevNumTruePositives = numTruePositives
+                prevNumFalsePositives = numFalsePositives
         
             if flatMarkerBuffer[ sortedIndices[ i ] ] == True:
                 numTruePositives += 1
