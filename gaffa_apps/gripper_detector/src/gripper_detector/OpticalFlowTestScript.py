@@ -168,10 +168,23 @@ if varianceROCCurve != None:
 axisROC.set_xlim( 0.0, 1.0 )
 axisROC.set_ylim( 0.0, 1.0 )
 
-for i in range( len( averageROCCurve.falsePositiveRates ) ):
-    print averageROCCurve.falsePositiveRates[ i ], averageROCCurve.truePositiveRates[ i ], averageROCCurve.scores[ i ]
+print "AUC = ", averageROCCurve.areaUnderCurve
 
-# Plot accuracy
+# Plot sensitivity vs specificity
+figureSvS = Figure( figsize=(8,6), dpi=72 )
+canvasSvS = FigureCanvas( figureSvS )
+axisSvS = figureSvS.add_subplot( 111 )
+
+
+if len( dataList ) > 1:
+    
+    curveList = [ data.rocCurve for data in dataList ]
+    averageROCCurve, varianceROCCurve = ROCCurve.averageROCCurves( curveList, 500 )
+
+axisSvS.plot( averageROCCurve.scores, averageROCCurve.sensitivity )
+axisSvS.plot( averageROCCurve.scores, averageROCCurve.specificity )
+axisSvS.set_xlim( 0.0, 1.0 )
+
 #figureAccuracy = Figure( figsize=(8,6), dpi=72 )
 #canvasAccuracy = FigureCanvas( figureAccuracy )
 #axisAccuracy = figureAccuracy.add_subplot( 111 )
@@ -205,7 +218,7 @@ for i in range( len( averageROCCurve.falsePositiveRates ) ):
 
 # Save the graphs
 figureROC.savefig( options.outputPrefix + "ROC.png" )
-#figureAccuracy.savefig( options.outputPrefix + "Accuracy.png" )
+figureSvS.savefig( options.outputPrefix + "SvS.png" )
         
 
  

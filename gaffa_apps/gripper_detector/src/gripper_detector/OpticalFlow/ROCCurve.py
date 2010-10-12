@@ -33,23 +33,20 @@ class ROCCurve:
         self.specificity = []
         self.accuracy = []
         self.scores = []
-        self.areaUnderCurve = 0
+        self.areaUnderCurve = 0.0
 
     #---------------------------------------------------------------------------
     def getROCValuesForFPR( self, fpr ):
         
-        i = -1
+        i = 0
         numPoints = len( self.truePositiveRates )
         
         while i < numPoints - 1 \
-            and self.falsePositiveRates[ i + 1 ] <= fpr:
+            and self.falsePositiveRates[ i + 1 ] < fpr:
             
             i += 1
             
-        if i < 0:
-            # No values found
-            return None
-        elif self.falsePositiveRates[ i ] == fpr:
+        if self.falsePositiveRates[ i ] == fpr:
             # Exact match found
             return ROCValues( self.truePositiveRates[ i ], self.accuracy[ i ], self.scores[ i ] )
         else:
@@ -75,7 +72,7 @@ class ROCCurve:
             
     #---------------------------------------------------------------------------
     @staticmethod
-    def averageROCCurves( curveList, numSteps = 10 ):
+    def averageROCCurves( curveList, numSteps = 50 ):
         
         numCurves = len( curveList )
         assert numCurves > 0
@@ -96,18 +93,24 @@ class ROCCurve:
         
         valueList = [ [ curveList[ curveIdx ].getROCValuesForFPR( fpr ) \
             for curveIdx in range( numCurves ) ] for fpr in avgROCCurve.falsePositiveRates ]
+            
+        prevAvgTPR = 0.0
+        prevAvgFPR = 0.0
         
         for i in range( len( avgROCCurve.falsePositiveRates ) ):
             
             # Calculate average for FPR threshold            
             tprList = [ valueList[ i ][ curveIdx ].truePositiveRate for curveIdx in range( numCurves ) ]
             accuracyList = [ valueList[ i ][ curveIdx ].accuracy for curveIdx in range( numCurves ) ]
+            scoreList = [ valueList[ i ][ curveIdx ].score for curveIdx in range( numCurves ) ]
             
             avgTruePositiveRate = sum( tprList )/numCurves
             avgAccuracy = sum( accuracyList )/numCurves
+            avgScore = sum( scoreList )/numCurves
             
             avgROCCurve.truePositiveRates.append( avgTruePositiveRate )
             avgROCCurve.accuracy.append( avgAccuracy )
+            avgROCCurve.scores.append( avgScore )
  
             # Also calculate variance
             tprSquaredDiffList = [ 
@@ -122,6 +125,13 @@ class ROCCurve:
             
             varianceROCCurve.truePositiveRates.append( varianceTruePositiveRate )
             varianceROCCurve.accuracy.append( varianceAccuracy )
+            
+            # Update the AUC
+            avgROCCurve.areaUnderCurve += ROCCurve.trapezoidArea( 
+                avgROCCurve.falsePositiveRates[ i ], prevAvgFPR,
+                avgTruePositiveRate, prevAvgTPR )
+            prevAvgTPR = avgTruePositiveRate
+            prevAvgFPR = avgROCCurve.falsePositiveRates[ i ]
         
         return (avgROCCurve, varianceROCCurve)
         
@@ -155,35 +165,41 @@ class GripperDetectorROCCurve( ROCCurve ):
         numFalsePositives = 0
         numTrueNegatives = 0
         
-        prevScore = None
+        prevScore = 1.0
         prevNumTruePositives = 0
         prevNumFalsePositives = 0
+        
+        self.truePositiveRates.append( 0.0 )
+        self.falsePositiveRates.append( 0.0 )
+        self.specificity.append( 1.0 )
+        self.accuracy.append( float(numTruePositives + numTrueNegatives)/totalSampleCount )
+        self.scores.append( 1.0 )
         
         for i in range( len( flatBlockScores ) ):
             
             score = flatBlockScores[ sortedIndices[ i ] ]
             
-            #if score <= 0.5:
-            #    break
-            
-            if prevScore == None or abs( score - prevScore ) > 0.00001:
+            ################
+            #if prevScore != score:
 
-                # New ROC point
-                truePositiveRate = float( numTruePositives ) / float( actualPositiveCount )
-                falsePositiveRate = float( numFalsePositives ) / float( actualNegativeCount )
-                self.truePositiveRates.append( truePositiveRate )
-                self.falsePositiveRates.append( falsePositiveRate )
-                self.specificity.append( 1.0 - falsePositiveRate )
-                self.accuracy.append( float(numTruePositives + numTrueNegatives)/totalSampleCount )
-                self.scores.append( score )
-                
-                self.areaUnderCurve += self.trapezoidArea( 
-                    numFalsePositives, prevNumFalsePositives,
-                    numTruePositives, prevNumTruePositives )
-                
-                prevScore = score
-                prevNumTruePositives = numTruePositives
-                prevNumFalsePositives = numFalsePositives
+            # New ROC point
+            truePositiveRate = float( numTruePositives ) / float( actualPositiveCount )
+            falsePositiveRate = float( numFalsePositives ) / float( actualNegativeCount )
+            self.truePositiveRates.append( truePositiveRate )
+            self.falsePositiveRates.append( falsePositiveRate )
+            self.specificity.append( 1.0 - falsePositiveRate )
+            self.accuracy.append( float(numTruePositives + numTrueNegatives)/totalSampleCount )
+            self.scores.append( score )
+            
+            self.areaUnderCurve += self.trapezoidArea( 
+                numFalsePositives, prevNumFalsePositives,
+                numTruePositives, prevNumTruePositives )
+            
+            prevScore = score
+            prevNumTruePositives = numTruePositives
+            prevNumFalsePositives = numFalsePositives
+            
+            ###############
         
             if flatMarkerBuffer[ sortedIndices[ i ] ] == True:
                 numTruePositives += 1
