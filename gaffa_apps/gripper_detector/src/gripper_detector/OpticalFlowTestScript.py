@@ -175,15 +175,9 @@ figureSvS = Figure( figsize=(8,6), dpi=72 )
 canvasSvS = FigureCanvas( figureSvS )
 axisSvS = figureSvS.add_subplot( 111 )
 
-
-if len( dataList ) > 1:
-    
-    curveList = [ data.rocCurve for data in dataList ]
-    averageROCCurve, varianceROCCurve = ROCCurve.averageROCCurves( curveList, 500 )
-
 axisSvS.plot( averageROCCurve.scores, averageROCCurve.sensitivity )
 axisSvS.plot( averageROCCurve.scores, averageROCCurve.specificity )
-axisSvS.set_xlim( 0.0, 1.0 )
+axisSvS.set_xlim( 1.0, 0.0 )
 
 #figureAccuracy = Figure( figsize=(8,6), dpi=72 )
 #canvasAccuracy = FigureCanvas( figureAccuracy )

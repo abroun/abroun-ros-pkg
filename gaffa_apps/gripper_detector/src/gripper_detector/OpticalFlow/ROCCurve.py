@@ -169,37 +169,44 @@ class GripperDetectorROCCurve( ROCCurve ):
         prevNumTruePositives = 0
         prevNumFalsePositives = 0
         
-        self.truePositiveRates.append( 0.0 )
-        self.falsePositiveRates.append( 0.0 )
-        self.specificity.append( 1.0 )
-        self.accuracy.append( float(numTruePositives + numTrueNegatives)/totalSampleCount )
-        self.scores.append( 1.0 )
+        #maxScore = score = flatBlockScores[ sortedIndices[ 0 ] ]
+        #if maxScore < 1.0 - 0.001:
+            #self.truePositiveRates.append( 0.0 )
+            #self.falsePositiveRates.append( 0.0 )
+            #self.specificity.append( 1.0 )
+            #self.accuracy.append( float(numTruePositives + numTrueNegatives)/totalSampleCount )
+            #self.scores.append( 1.0 )
+            
+            #self.truePositiveRates.append( 0.0 )
+            #self.falsePositiveRates.append( 0.0 )
+            #self.specificity.append( 1.0 )
+            #self.accuracy.append( float(numTruePositives + numTrueNegatives)/totalSampleCount )
+            #self.scores.append( maxScore + 0.001 )
+            
+            #print self.scores
         
         for i in range( len( flatBlockScores ) ):
             
             score = flatBlockScores[ sortedIndices[ i ] ]
             
-            ################
-            #if prevScore != score:
+            if prevScore != score:
 
-            # New ROC point
-            truePositiveRate = float( numTruePositives ) / float( actualPositiveCount )
-            falsePositiveRate = float( numFalsePositives ) / float( actualNegativeCount )
-            self.truePositiveRates.append( truePositiveRate )
-            self.falsePositiveRates.append( falsePositiveRate )
-            self.specificity.append( 1.0 - falsePositiveRate )
-            self.accuracy.append( float(numTruePositives + numTrueNegatives)/totalSampleCount )
-            self.scores.append( score )
-            
-            self.areaUnderCurve += self.trapezoidArea( 
-                numFalsePositives, prevNumFalsePositives,
-                numTruePositives, prevNumTruePositives )
-            
-            prevScore = score
-            prevNumTruePositives = numTruePositives
-            prevNumFalsePositives = numFalsePositives
-            
-            ###############
+                # New ROC point
+                truePositiveRate = float( numTruePositives ) / float( actualPositiveCount )
+                falsePositiveRate = float( numFalsePositives ) / float( actualNegativeCount )
+                self.truePositiveRates.append( truePositiveRate )
+                self.falsePositiveRates.append( falsePositiveRate )
+                self.specificity.append( 1.0 - falsePositiveRate )
+                self.accuracy.append( float(numTruePositives + numTrueNegatives)/totalSampleCount )
+                self.scores.append( score )
+                
+                self.areaUnderCurve += self.trapezoidArea( 
+                    numFalsePositives, prevNumFalsePositives,
+                    numTruePositives, prevNumTruePositives )
+                
+                prevScore = score
+                prevNumTruePositives = numTruePositives
+                prevNumFalsePositives = numFalsePositives
         
             if flatMarkerBuffer[ sortedIndices[ i ] ] == True:
                 numTruePositives += 1
