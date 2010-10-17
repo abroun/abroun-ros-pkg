@@ -2,6 +2,7 @@
 import math
 import numpy as np
 import Utils
+import scipy.ndimage
 
 #-------------------------------------------------------------------------------
 class RegularisedInputSequence:
@@ -42,3 +43,12 @@ class RegularisedInputSequence:
             inputSequence.opticalFlowArraysX, inputSequence.imageTimes, self.regularSampleTimes )
         self.regularOpticalFlowArrayY = np.apply_along_axis( Utils.resampleSequence, 2, 
             inputSequence.opticalFlowArraysY, inputSequence.imageTimes, self.regularSampleTimes )            
+           
+    #--------------------------------------------------------------------------- 
+    def smoothOpticalFlow( self, gaussianStdDev ):
+        self.regularOpticalFlowArrayX = np.apply_along_axis( 
+            scipy.ndimage.gaussian_filter1d,
+            2, self.regularOpticalFlowArrayX, gaussianStdDev )
+        self.regularOpticalFlowArrayY = np.apply_along_axis( 
+            scipy.ndimage.gaussian_filter1d,
+            2, self.regularOpticalFlowArrayY, gaussianStdDev )

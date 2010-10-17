@@ -88,6 +88,8 @@ markerBuffer = MarkerBuffer.loadMarkerBuffer( markerFilename )
 if markerBuffer == None:
     print "Error: Unable to load marker buffer -", markerFilename
 
+GAUSSIAN_STD_DEV = 0.5
+
 # Process each bag file in turn
 dataList = []
 for bagFilename in bagFilenames:
@@ -102,6 +104,8 @@ for bagFilename in bagFilenames:
     print "Resampling data"
     regularisedInputSequence = RegularisedInputSequence( 
         inputSequence, SAMPLES_PER_SECOND )
+    if GAUSSIAN_STD_DEV > 0.0:
+        regularisedInputSequence.smoothOpticalFlow( GAUSSIAN_STD_DEV )
 
     print "Performing cross correlation"
     crossCorrelatedSequence = CrossCorrelatedSequence( 
@@ -131,6 +135,9 @@ canvasROC = FigureCanvas( figureROC )
 axisROC = figureROC.add_subplot( 111 )
 
 axisROC.plot( averageROCCurve.falsePositiveRates, averageROCCurve.truePositiveRates )
+axisROC.set_xlabel( 'False Positive Rate' )
+axisROC.set_ylabel( 'True Positive Rate' )
+
 
 # Add error bars
 if varianceROCCurve != None:
@@ -154,7 +161,8 @@ if varianceROCCurve != None:
             errorErrTPR.append( math.sqrt( varianceROCCurve.truePositiveRates[ i ] )*2.571 )
             
     axisROC.errorbar( errorFPR, errorTPR, 
-        xerr=errorErrFPR, yerr=errorErrTPR, linestyle='None' )
+        yerr=errorErrTPR, linestyle='None' )
+        #xerr=errorErrFPR, yerr=errorErrTPR, linestyle='None' )
         
     #print errorFPR
     #print errorTPR
@@ -194,6 +202,17 @@ if varianceROCCurve != None:
             errorErrAccuracy.append( math.sqrt( varianceROCCurve.accuracy[ i ] )*2.571 )
           
     axisAccuracy.errorbar( errorThreshold, errorAccuracy, yerr=errorErrAccuracy, linestyle='None' )
+
+# Mark the threshold with the maximum accuracy
+maxAccuracyThreshold = thresholds[ np.argsort( averageROCCurve.accuracy )[ -1 ] ]
+axisAccuracy.axvline( x=float( maxAccuracyThreshold ), color='red' )
+
+axisAccuracy.set_xlabel( 'Threshold' )
+axisAccuracy.set_ylabel( 'Accuracy' )
+
+# Display AUC
+print "AUC =", averageROCCurve.areaUnderCurve
+print "Max accuracy at", maxAccuracyThreshold
 
 # Save the graphs
 figureROC.savefig( options.outputPrefix + "ROC.png" )

@@ -71,7 +71,7 @@ class MainWindow:
     #GROUND_TRUTH_FILENAME = "/../../config/OnTablePosGripper.yaml"
     GROUND_TRUTH_FILENAME = "/../../config/BasicWave_Gripper.yaml"
     
-    CORRELATION_THRESHOLD = 0.4
+    CORRELATION_THRESHOLD = 0.45
     MAX_TEST_POINT_X = (320 - OPTICAL_FLOW_BLOCK_WIDTH)/OPTICAL_FLOW_BLOCK_WIDTH - 1
     MAX_TEST_POINT_Y = (240 - OPTICAL_FLOW_BLOCK_HEIGHT)/OPTICAL_FLOW_BLOCK_HEIGHT - 1
     
@@ -391,7 +391,7 @@ class MainWindow:
                         
                     blockY += self.OPTICAL_FLOW_BLOCK_HEIGHT
              
-            #return
+            return
                
             # Draw the optical flow if it's available
             opticalFlowX = self.inputSequence.opticalFlowArraysX[ :, :, self.frameIdx ]

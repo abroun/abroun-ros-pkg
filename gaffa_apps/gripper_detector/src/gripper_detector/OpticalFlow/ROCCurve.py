@@ -19,11 +19,19 @@ class ROCCurve:
         self.sensitivity = self.truePositiveRates
         self.specificity = []
         self.accuracy = []
+        self.areaUnderCurve = 0.0
         
     #---------------------------------------------------------------------------
     def calculateThresholds( self ):
         
         return np.arange( 0.0, 1.0 + self.thresholdStepSize, self.thresholdStepSize )
+        
+    #---------------------------------------------------------------------------
+    @staticmethod
+    def trapezoidArea( x1, x2, y1, y2 ):
+        base = abs( x1 - x2 )
+        averageHeight = float( y1 + y2 )/2.0
+        return base*averageHeight
         
     #---------------------------------------------------------------------------
     @staticmethod
@@ -39,6 +47,9 @@ class ROCCurve:
             
         avgROCCurve = ROCCurve( thresholdStepSize )
         varianceROCCurve = ROCCurve( thresholdStepSize )
+        
+        prevAvgTruePositiveRate = 1.0
+        prevAvgFalsePositiveRate = 1.0
         
         thresholds = curveList[ 0 ].calculateThresholds()
         for thresholdIdx in range( len( thresholds ) ):
@@ -64,6 +75,12 @@ class ROCCurve:
             avgROCCurve.falsePositiveRates.append( avgFalsePositiveRate )
             avgROCCurve.specificity.append( avgSpecificity )
             avgROCCurve.accuracy.append( avgAccuracy )
+            
+            avgROCCurve.areaUnderCurve += ROCCurve.trapezoidArea(
+                prevAvgFalsePositiveRate, avgFalsePositiveRate,
+                prevAvgTruePositiveRate, avgTruePositiveRate )
+            prevAvgTruePositiveRate = avgTruePositiveRate
+            prevAvgFalsePositiveRate = avgFalsePositiveRate
  
             # Also calculate variance
             varianceTruePositiveRate = 0
@@ -105,6 +122,9 @@ class GripperDetectorROCCurve( ROCCurve ):
         
         thresholds = self.calculateThresholds()
         
+        prevTruePositiveRate = 1.0
+        prevFalsePositiveRate = 1.0
+        
         # Calculate the true positive rate and false positive rate for each
         # threshold value
         for threshold in thresholds:
@@ -138,3 +158,10 @@ class GripperDetectorROCCurve( ROCCurve ):
             self.falsePositiveRates.append( falsePositiveRate )
             self.specificity.append( 1.0 - falsePositiveRate )
             self.accuracy.append( float(numTruePositives + numTrueNegatives)/totalSampleCount )
+            
+            self.areaUnderCurve += ROCCurve.trapezoidArea(
+                prevFalsePositiveRate, falsePositiveRate,
+                prevTruePositiveRate, truePositiveRate )
+            prevTruePositiveRate = truePositiveRate
+            prevFalsePositiveRate = falsePositiveRate
+
