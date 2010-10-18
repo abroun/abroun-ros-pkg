@@ -64,160 +64,204 @@ class WorkingData:
         self.regularisedInputSequence = regularisedInputSequence
         self.crossCorrelatedSequence = crossCorrelatedSequence
         self.rocCurve = rocCurve
+        
+#-------------------------------------------------------------------------------
+def evaluateClassifier( markerFilename, bagFilenames, 
+                        rocGraphFilename = None, accuracyGraphFilename = None ):
+    '''Takes a list of bag files in as data for the classifier and evaluates
+       the classifer against a ground truth marker file. Returns the average AUC
+       and optimal threshold for the classifier.'''
+
+    # Load in marker buffer for evaluating classifier
+    markerBuffer = MarkerBuffer.loadMarkerBuffer( markerFilename )
+    if markerBuffer == None:
+        print "Error: Unable to load marker buffer -", markerFilename
+
+    GAUSSIAN_STD_DEV = 0.0
+
+    # Process each bag file in turn
+    dataList = []
+    for bagFilename in bagFilenames:
+        print "Reading in bag file -", bagFilename
+        inputSequence = InputSequence( bagFilename )
+        #inputSequence.addDistractorObjects( 4 )
+        inputSequence.calculateOpticalFlow(
+            OPTICAL_FLOW_BLOCK_WIDTH, OPTICAL_FLOW_BLOCK_HEIGHT,
+            OPTICAL_FLOW_RANGE_WIDTH, OPTICAL_FLOW_RANGE_HEIGHT,
+            OPTICAL_FLOW_METHOD )
+
+        #print "Resampling data"
+        regularisedInputSequence = RegularisedInputSequence( 
+            inputSequence, SAMPLES_PER_SECOND )
+        if GAUSSIAN_STD_DEV > 0.0:
+            regularisedInputSequence.smoothOpticalFlow( GAUSSIAN_STD_DEV )
+
+        #print "Performing cross correlation"
+        crossCorrelatedSequence = CrossCorrelatedSequence( 
+            regularisedInputSequence, 
+            MAX_CORRELATION_LAG, COMBINATION_METHOD )
+            
+        #print "Building ROC Curve"
+        rocCurve = GripperDetectorROCCurve( crossCorrelatedSequence, markerBuffer )
+        
+        dataList.append( WorkingData( bagFilename, inputSequence, 
+            regularisedInputSequence, crossCorrelatedSequence, rocCurve ) )
+        
+    # Average results
+    if len( dataList ) > 1:
+        
+        curveList = [ data.rocCurve for data in dataList ]
+        averageROCCurve, varianceROCCurve = ROCCurve.averageROCCurves( curveList )
+
+    else:
+        
+        averageROCCurve = dataList[ 0 ].rocCurve
+        varianceROCCurve = None
+    
+    # Plot ROC Curve 
+    figureROC = Figure( figsize=(8,6), dpi=72 )
+    canvasROC = FigureCanvas( figureROC )
+    axisROC = figureROC.add_subplot( 111 )
+
+    axisROC.plot( averageROCCurve.falsePositiveRates, averageROCCurve.truePositiveRates )
+    axisROC.set_xlabel( 'False Positive Rate' )
+    axisROC.set_ylabel( 'True Positive Rate' )
+
+
+    # Add error bars
+    if varianceROCCurve != None:
+        
+        diffBetweenErrorBars = 0.05 #1.0/(NUM_ERROR_BARS)
+        lastFPRValue = averageROCCurve.falsePositiveRates[ 0 ]
+        
+        errorFPR = []
+        errorTPR = []
+        errorErrFPR = []
+        errorErrTPR = []
+        for i in range( len( averageROCCurve.falsePositiveRates ) ):
+            
+            curFPRValue = averageROCCurve.falsePositiveRates[ i ]
+            if abs( curFPRValue - lastFPRValue ) >= diffBetweenErrorBars:
+                lastFPRValue = curFPRValue
+            
+                errorFPR.append( averageROCCurve.falsePositiveRates[ i ] )
+                errorTPR.append( averageROCCurve.truePositiveRates[ i ] )
+                errorErrFPR.append( math.sqrt( varianceROCCurve.falsePositiveRates[ i ] )*2.571 )
+                errorErrTPR.append( math.sqrt( varianceROCCurve.truePositiveRates[ i ] )*2.571 )
+                
+        axisROC.errorbar( errorFPR, errorTPR, 
+            yerr=errorErrTPR, linestyle='None' )
+            #xerr=errorErrFPR, yerr=errorErrTPR, linestyle='None' )
+            
+        #print errorFPR
+        #print errorTPR
+        #print lastFPRValue, averageROCCurve.falsePositiveRates[ -1 ]
+
+    axisROC.set_xlim( 0.0, 1.0 )
+    axisROC.set_ylim( 0.0, 1.0 )
+
+    # Plot accuracy
+    figureAccuracy = Figure( figsize=(8,6), dpi=72 )
+    canvasAccuracy = FigureCanvas( figureAccuracy )
+    axisAccuracy = figureAccuracy.add_subplot( 111 )
+
+    thresholds = averageROCCurve.calculateThresholds()
+    axisAccuracy.plot( thresholds, averageROCCurve.accuracy )
+
+    #for data in dataList:
+    #    axisAccuracy.plot( thresholds, data.rocCurve.accuracy )
+
+    # Add error bars
+    if varianceROCCurve != None:
+        
+        diffBetweenErrorBars = 1.0/(NUM_ERROR_BARS)
+        lastThresholdValue = thresholds[ 0 ]
+        
+        errorThreshold = []
+        errorAccuracy = []
+        errorErrAccuracy = []
+        for i in range( len( thresholds ) ):
+            
+            curThresholdValue = thresholds[ i ]
+            if abs( curThresholdValue - lastThresholdValue ) >= diffBetweenErrorBars:
+                lastThresholdValue = curThresholdValue
+            
+                errorThreshold.append( curThresholdValue )
+                errorAccuracy.append( averageROCCurve.accuracy[ i ] )
+                errorErrAccuracy.append( math.sqrt( varianceROCCurve.accuracy[ i ] )*2.571 )
+            
+        axisAccuracy.errorbar( errorThreshold, errorAccuracy, yerr=errorErrAccuracy, linestyle='None' )
+
+    # Mark the threshold with the maximum accuracy
+    maxAccuracyThreshold = thresholds[ np.argsort( averageROCCurve.accuracy )[ -1 ] ]
+    axisAccuracy.axvline( x=float( maxAccuracyThreshold ), color='red' )
+
+    axisAccuracy.set_xlabel( 'Threshold' )
+    axisAccuracy.set_ylabel( 'Accuracy' )
+
+    # Save the graphs
+    if rocGraphFilename != None:
+        figureROC.savefig( rocGraphFilename )
+    if accuracyGraphFilename != None:
+        figureAccuracy.savefig( accuracyGraphFilename )
+        
+    return averageROCCurve.areaUnderCurve, maxAccuracyThreshold
 
 #-------------------------------------------------------------------------------
 usage = "usage: %prog [options] maskFile bagFiles"
 parser = OptionParser( usage=usage )
 parser.add_option( "-p", "--prefix", dest="outputPrefix", default="", 
     help="The prefix to prepend to the output filenames" )
+parser.add_option( "-e", "--evalVar", 
+    action="store_true", dest="evaluateVariableNumWaves", default=False,
+    help="Evaluate the effect on AUC of a variable number of waves")
+
+
 #parser.add_option( "-o", "--output", dest="outputFilename", default="out.bag",
 #                  help="Write output to file", metavar="FILE")
 
 (options, args) = parser.parse_args()
 
-if len( args ) < 2:
-    print "Error: Not enough arguments supplied"
-    parser.print_help()
-    sys.exit( -1 )
+if options.evaluateVariableNumWaves:
+    if len( args ) < 1:
+        print "Error: Not enough arguments supplied"
+        parser.print_help()
+        sys.exit( -1 )
     
-markerFilename = args[ 0 ]
-bagFilenames = args[ 1: ]
-
-# Load in marker buffer for evaluating classifier
-markerBuffer = MarkerBuffer.loadMarkerBuffer( markerFilename )
-if markerBuffer == None:
-    print "Error: Unable to load marker buffer -", markerFilename
-
-GAUSSIAN_STD_DEV = 0.5
-
-# Process each bag file in turn
-dataList = []
-for bagFilename in bagFilenames:
-    print "Reading in bag file"
-    inputSequence = InputSequence( bagFilename )
-    #inputSequence.addDistractorObjects( 4 )
-    inputSequence.calculateOpticalFlow(
-        OPTICAL_FLOW_BLOCK_WIDTH, OPTICAL_FLOW_BLOCK_HEIGHT,
-        OPTICAL_FLOW_RANGE_WIDTH, OPTICAL_FLOW_RANGE_HEIGHT,
-        OPTICAL_FLOW_METHOD )
-
-    print "Resampling data"
-    regularisedInputSequence = RegularisedInputSequence( 
-        inputSequence, SAMPLES_PER_SECOND )
-    if GAUSSIAN_STD_DEV > 0.0:
-        regularisedInputSequence.smoothOpticalFlow( GAUSSIAN_STD_DEV )
-
-    print "Performing cross correlation"
-    crossCorrelatedSequence = CrossCorrelatedSequence( 
-        regularisedInputSequence, 
-        MAX_CORRELATION_LAG, COMBINATION_METHOD )
+    markerFilename = args[ 0 ]
+    
+    MAX_NUM_WAVES = 9
+    waveNumList = range( 1, MAX_NUM_WAVES + 1 )
+    
+    results = []
+    
+    for waveNum in waveNumList:
+        bagFilenames = [ "VarWave_{0:02}_{1:02}_Waves.bag".format( testIdx, waveNum ) for testIdx in range( 1, 6 ) ]
         
-    print "Building ROC Curve"
-    rocCurve = GripperDetectorROCCurve( crossCorrelatedSequence, markerBuffer )
-    
-    dataList.append( WorkingData( bagFilename, inputSequence, 
-        regularisedInputSequence, crossCorrelatedSequence, rocCurve ) )
+        averageAreaUnderCurve, maxAccuracyThreshold = \
+            evaluateClassifier( markerFilename, bagFilenames )
         
-# Average results
-if len( dataList ) > 1:
+        results.append( ( waveNum, averageAreaUnderCurve, maxAccuracyThreshold ) )
     
-    curveList = [ data.rocCurve for data in dataList ]
-    averageROCCurve, varianceROCCurve = ROCCurve.averageROCCurves( curveList )
-
+    print results
 else:
-    
-    averageROCCurve = dataList[ 0 ].rocCurve
-    varianceROCCurve = None
-   
-# Plot ROC Curve 
-figureROC = Figure( figsize=(8,6), dpi=72 )
-canvasROC = FigureCanvas( figureROC )
-axisROC = figureROC.add_subplot( 111 )
+    if len( args ) < 2:
+        print "Error: Not enough arguments supplied"
+        parser.print_help()
+        sys.exit( -1 )
 
-axisROC.plot( averageROCCurve.falsePositiveRates, averageROCCurve.truePositiveRates )
-axisROC.set_xlabel( 'False Positive Rate' )
-axisROC.set_ylabel( 'True Positive Rate' )
+    markerFilename = args[ 0 ]
+    bagFilenames = args[ 1: ]
 
+    averageAreaUnderCurve, maxAccuracyThreshold = evaluateClassifier( 
+        markerFilename, bagFilenames,
+        rocGraphFilename = options.outputPrefix + "ROC.png",
+        accuracyGraphFilename = options.outputPrefix + "Accuracy.png" )
 
-# Add error bars
-if varianceROCCurve != None:
-    
-    diffBetweenErrorBars = 0.05 #1.0/(NUM_ERROR_BARS)
-    lastFPRValue = averageROCCurve.falsePositiveRates[ 0 ]
-    
-    errorFPR = []
-    errorTPR = []
-    errorErrFPR = []
-    errorErrTPR = []
-    for i in range( len( averageROCCurve.falsePositiveRates ) ):
-        
-        curFPRValue = averageROCCurve.falsePositiveRates[ i ]
-        if abs( curFPRValue - lastFPRValue ) >= diffBetweenErrorBars:
-            lastFPRValue = curFPRValue
-        
-            errorFPR.append( averageROCCurve.falsePositiveRates[ i ] )
-            errorTPR.append( averageROCCurve.truePositiveRates[ i ] )
-            errorErrFPR.append( math.sqrt( varianceROCCurve.falsePositiveRates[ i ] )*2.571 )
-            errorErrTPR.append( math.sqrt( varianceROCCurve.truePositiveRates[ i ] )*2.571 )
-            
-    axisROC.errorbar( errorFPR, errorTPR, 
-        yerr=errorErrTPR, linestyle='None' )
-        #xerr=errorErrFPR, yerr=errorErrTPR, linestyle='None' )
-        
-    #print errorFPR
-    #print errorTPR
-    #print lastFPRValue, averageROCCurve.falsePositiveRates[ -1 ]
+    # Display AUC
+    print "AUC =", averageAreaUnderCurve
+    print "Max accuracy at", maxAccuracyThreshold
 
-axisROC.set_xlim( 0.0, 1.0 )
-axisROC.set_ylim( 0.0, 1.0 )
-
-# Plot accuracy
-figureAccuracy = Figure( figsize=(8,6), dpi=72 )
-canvasAccuracy = FigureCanvas( figureAccuracy )
-axisAccuracy = figureAccuracy.add_subplot( 111 )
-
-thresholds = averageROCCurve.calculateThresholds()
-axisAccuracy.plot( thresholds, averageROCCurve.accuracy )
-
-#for data in dataList:
-#    axisAccuracy.plot( thresholds, data.rocCurve.accuracy )
-
-# Add error bars
-if varianceROCCurve != None:
-    
-    diffBetweenErrorBars = 1.0/(NUM_ERROR_BARS)
-    lastThresholdValue = thresholds[ 0 ]
-    
-    errorThreshold = []
-    errorAccuracy = []
-    errorErrAccuracy = []
-    for i in range( len( thresholds ) ):
-        
-        curThresholdValue = thresholds[ i ]
-        if abs( curThresholdValue - lastThresholdValue ) >= diffBetweenErrorBars:
-            lastThresholdValue = curThresholdValue
-        
-            errorThreshold.append( curThresholdValue )
-            errorAccuracy.append( averageROCCurve.accuracy[ i ] )
-            errorErrAccuracy.append( math.sqrt( varianceROCCurve.accuracy[ i ] )*2.571 )
-          
-    axisAccuracy.errorbar( errorThreshold, errorAccuracy, yerr=errorErrAccuracy, linestyle='None' )
-
-# Mark the threshold with the maximum accuracy
-maxAccuracyThreshold = thresholds[ np.argsort( averageROCCurve.accuracy )[ -1 ] ]
-axisAccuracy.axvline( x=float( maxAccuracyThreshold ), color='red' )
-
-axisAccuracy.set_xlabel( 'Threshold' )
-axisAccuracy.set_ylabel( 'Accuracy' )
-
-# Display AUC
-print "AUC =", averageROCCurve.areaUnderCurve
-print "Max accuracy at", maxAccuracyThreshold
-
-# Save the graphs
-figureROC.savefig( options.outputPrefix + "ROC.png" )
-figureAccuracy.savefig( options.outputPrefix + "Accuracy.png" )
-        
 
  
 
