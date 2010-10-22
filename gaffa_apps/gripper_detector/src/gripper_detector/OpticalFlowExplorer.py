@@ -36,7 +36,7 @@ from matplotlib.backends.backend_gtkagg import NavigationToolbar2GTKAgg as Navig
 from abroun_gtk_gui.widgets import SequenceControl
 
 import OpticalFlow.Utils as Utils
-from OpticalFlow.InputSequence import InputSequence
+from OpticalFlow.InputSequence import InputSequence, Distractor
 from OpticalFlow.RegularisedInputSequence import RegularisedInputSequence
 from OpticalFlow.CrossCorrelatedSequence import CrossCorrelatedSequence
 from OpticalFlow.ROCCurve import ROCCurve, GripperDetectorROCCurve
@@ -71,7 +71,7 @@ class MainWindow:
     #GROUND_TRUTH_FILENAME = "/../../config/OnTablePosGripper.yaml"
     GROUND_TRUTH_FILENAME = "/../../config/BasicWave_Gripper.yaml"
     
-    CORRELATION_THRESHOLD = 0.45
+    CORRELATION_THRESHOLD = 0.6
     MAX_TEST_POINT_X = (320 - OPTICAL_FLOW_BLOCK_WIDTH)/OPTICAL_FLOW_BLOCK_WIDTH - 1
     MAX_TEST_POINT_Y = (240 - OPTICAL_FLOW_BLOCK_HEIGHT)/OPTICAL_FLOW_BLOCK_HEIGHT - 1
     
@@ -94,7 +94,15 @@ class MainWindow:
         t1 = time.time()
         
         self.inputSequence = InputSequence( bagFilename )
-        #self.inputSequence.addDistractorObjects( 4 )
+        
+        distractors = [
+            Distractor( radius=24, startPos=( 25, 35 ), endPos=( 100, 100 ), frequency=2.0 ),
+            Distractor( radius=24, startPos=( 200, 200 ), endPos=( 150, 50 ), frequency=0.25 ),
+            Distractor( radius=24, startPos=( 188, 130 ), endPos=( 168, 258 ), frequency=0.6 ),
+            Distractor( radius=24, startPos=( 63, 94 ), endPos=( 170, 81 ), frequency=1.5 ),
+            Distractor( radius=24, startPos=( 40, 287 ), endPos=( 50, 197 ), frequency=3.0 ) ]
+        self.inputSequence.addDistractorObjects( distractors )
+        
         self.inputSequence.calculateOpticalFlow(
             self.OPTICAL_FLOW_BLOCK_WIDTH, self.OPTICAL_FLOW_BLOCK_HEIGHT,
             self.OPTICAL_FLOW_RANGE_WIDTH, self.OPTICAL_FLOW_RANGE_HEIGHT,

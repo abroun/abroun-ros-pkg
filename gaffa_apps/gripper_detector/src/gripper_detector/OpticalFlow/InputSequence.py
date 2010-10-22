@@ -11,6 +11,17 @@ sys.path.append( "../" )
 from OpticalFlowFilter import OpticalFlowFilter
 
 #-------------------------------------------------------------------------------
+class Distractor:
+    
+    #---------------------------------------------------------------------------
+    def __init__( self, radius, startPos, endPos, frequency ):
+        
+        self.radius = radius
+        self.startPos = startPos
+        self.endPos = endPos
+        self.frequency = frequency
+
+#-------------------------------------------------------------------------------
 class InputSequence:
     '''A sequence of images and a sequence of servo angles read from a bag file''' 
     
@@ -69,44 +80,42 @@ class InputSequence:
         self.servoAngleData = Utils.normaliseSequence( self.servoAngleData )
        
     #---------------------------------------------------------------------------
-    def addDistractorObjects( self, numDistractorObjects, randomSeed = None ):
-        
-        DISTRACTOR_RADIUS = 24
-        DISTRACTOR_DIM = DISTRACTOR_RADIUS*2 + 1
-        i = np.indices( ( DISTRACTOR_DIM, DISTRACTOR_DIM ) ) - DISTRACTOR_RADIUS
-        distractorIndices = np.where( i[0]*i[0] + i[1]*i[1] <= DISTRACTOR_RADIUS*DISTRACTOR_RADIUS )
-        
-        startPos = ( 12, 12 )
-        endPos = ( 35, 36 )
-        frequency = 0.8
-        
-        distractorPos = ( 12, 12 )
+    def addDistractorObjects( self, distractors, randomSeed = None ):
         
         if randomSeed != None:
             random.seed( randomSeed )
-            
-        distractorData = np.array( 
-            np.random.rand( DISTRACTOR_DIM, DISTRACTOR_DIM )*255, dtype=np.int8 )
         
-        # Add the distractors to the image
-        for imageIdx, image in enumerate( self.cameraImages ):
+        for distractor in distractors:
             
-            time = self.imageTimes[ imageIdx ]
-            offset = math.cos( time*frequency*2.0*math.pi )
-            offset = (1.0 - offset) / 2.0
+            distractorRadius = int( distractor.radius )
+            distractorDim = distractorRadius*2 + 1
+            i = np.indices( ( distractorDim, distractorDim ) ) - distractorRadius
+            distractorIndices = np.where( i[0]*i[0] + i[1]*i[1] <= distractorRadius*distractorRadius )
             
-            if time < 3.5 or time > 7.5:
-                continue
+            startPos = ( int( distractor.startPos[ 0 ] ), int( distractor.startPos[ 1 ] ) )
+            endPos = ( int( distractor.endPos[ 0 ] ), int( distractor.endPos[ 1 ] ) )
+            frequency = distractor.frequency
+                
+            distractorData = np.array( 
+                np.random.rand( distractorDim, distractorDim )*255, dtype=np.int8 )
             
-            posX = int( startPos[ 0 ] + offset*(endPos[ 0 ] - startPos[ 0 ]) )
-            posY = int( startPos[ 1 ] + offset*(endPos[ 1 ] - startPos[ 1 ]) )
-            
-            imageTargetIndices = ( 
-                distractorIndices[ 0 ] - DISTRACTOR_RADIUS + posX,
-                distractorIndices[ 1 ] - DISTRACTOR_RADIUS + posY )
-            image[ imageTargetIndices[ 0 ], imageTargetIndices[ 1 ], 0 ] = distractorData[ distractorIndices ]
-            image[ imageTargetIndices[ 0 ], imageTargetIndices[ 1 ], 1 ] = distractorData[ distractorIndices ]
-            image[ imageTargetIndices[ 0 ], imageTargetIndices[ 1 ], 2 ] = distractorData[ distractorIndices ]
+            # Add the distractor to the image
+            for imageIdx, image in enumerate( self.cameraImages ):
+                
+                time = self.imageTimes[ imageIdx ]
+                offset = math.cos( time*frequency*2.0*math.pi )
+                offset = (1.0 - offset) / 2.0
+                
+                posX = int( startPos[ 0 ] + offset*(endPos[ 0 ] - startPos[ 0 ]) )
+                posY = int( startPos[ 1 ] + offset*(endPos[ 1 ] - startPos[ 1 ]) )
+                
+                imageTargetIndices = ( 
+                    distractorIndices[ 0 ] - distractorRadius + posX,
+                    distractorIndices[ 1 ] - distractorRadius + posY )
+                
+                image[ imageTargetIndices[ 0 ], imageTargetIndices[ 1 ], 0 ] = distractorData[ distractorIndices ]
+                image[ imageTargetIndices[ 0 ], imageTargetIndices[ 1 ], 1 ] = distractorData[ distractorIndices ]
+                image[ imageTargetIndices[ 0 ], imageTargetIndices[ 1 ], 2 ] = distractorData[ distractorIndices ]
 
     #---------------------------------------------------------------------------
     def calculateOpticalFlow( self,
