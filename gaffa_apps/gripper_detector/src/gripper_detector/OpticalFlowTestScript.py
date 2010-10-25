@@ -24,7 +24,7 @@ from matplotlib.axes import Subplot
 from matplotlib.backends.backend_gtkagg import FigureCanvasGTKAgg as FigureCanvas
 
 import OpticalFlow.Utils as Utils
-from OpticalFlow.InputSequence import InputSequence
+from OpticalFlow.InputSequence import InputSequence, Distractor
 from OpticalFlow.RegularisedInputSequence import RegularisedInputSequence
 from OpticalFlow.CrossCorrelatedSequence import CrossCorrelatedSequence
 from OpticalFlow.ROCCurve import ROCCurve, GripperDetectorROCCurve
@@ -52,6 +52,7 @@ MAX_TEST_POINT_Y = (240 - OPTICAL_FLOW_BLOCK_HEIGHT)/OPTICAL_FLOW_BLOCK_HEIGHT -
 SAMPLES_PER_SECOND = 30.0
 MAX_CORRELATION_LAG = 1.0
 NUM_ERROR_BARS = 10
+ADD_DISTRACTORS = False
 
 #-------------------------------------------------------------------------------
 class WorkingData:
@@ -84,7 +85,16 @@ def evaluateClassifier( markerFilename, bagFilenames,
     for bagFilename in bagFilenames:
         print "Reading in bag file -", bagFilename
         inputSequence = InputSequence( bagFilename )
-        #inputSequence.addDistractorObjects( 4 )
+        
+        if ADD_DISTRACTORS:
+            distractors = [
+                Distractor( radius=24, startPos=( 25, 35 ), endPos=( 100, 100 ), frequency=2.0 ),
+                Distractor( radius=24, startPos=( 200, 200 ), endPos=( 150, 50 ), frequency=0.25 ),
+                Distractor( radius=24, startPos=( 188, 130 ), endPos=( 168, 258 ), frequency=0.6 ),
+                Distractor( radius=24, startPos=( 63, 94 ), endPos=( 170, 81 ), frequency=1.5 ),
+                Distractor( radius=24, startPos=( 40, 287 ), endPos=( 50, 197 ), frequency=3.0 ) ]
+            inputSequence.addDistractorObjects( distractors )
+        
         inputSequence.calculateOpticalFlow(
             OPTICAL_FLOW_BLOCK_WIDTH, OPTICAL_FLOW_BLOCK_HEIGHT,
             OPTICAL_FLOW_RANGE_WIDTH, OPTICAL_FLOW_RANGE_HEIGHT,
@@ -234,7 +244,7 @@ if options.evaluateVariableNumWaves:
     waveNumList = range( 1, MAX_NUM_WAVES + 1 )
     
     #smoothingStdDevs = [ 1.0, 1.5, 2.0, 3.0, 4.0, 5.0 ]
-    smoothingStdDevs = [ 5.0 ]
+    smoothingStdDevs = [ 0.0 ]
     
     for gaussianStdDev in smoothingStdDevs:
         results = []

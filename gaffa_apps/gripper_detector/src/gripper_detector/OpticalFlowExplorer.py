@@ -377,6 +377,8 @@ class MainWindow:
                 self.cameraImagePixBuf, srcX, srcY, 
                 imgRect.x, imgRect.y, imgRect.width, imgRect.height )
                
+            #return
+               
             # Draw an overlay to show places where the input motion has been detected
             if self.inputSignalDetectedArray != None:
                 
