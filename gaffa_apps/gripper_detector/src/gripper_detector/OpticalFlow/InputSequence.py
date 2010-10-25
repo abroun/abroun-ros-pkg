@@ -1,5 +1,6 @@
 
 from ros import rosrecord
+import rosbag
 import numpy as np
 import cv
 import Utils
@@ -45,7 +46,8 @@ class InputSequence:
         lastAngleTime = -1.0
         lastCameraTime = -1.0
         
-        for topic, msg, t in rosrecord.logplayer( bagFilename ):
+        bag = rosbag.Bag( bagFilename )
+        for topic, msg, t in bag.read_messages():
             if startTime == None:
                 startTime = t
                 
@@ -76,7 +78,9 @@ class InputSequence:
             
                 else:
                     rospy.logerr( "Unhandled image encoding - " + rosImage.encoding )
-                
+        
+        bag.close()   
+        del bag     
         self.servoAngleData = Utils.normaliseSequence( self.servoAngleData )
        
     #---------------------------------------------------------------------------

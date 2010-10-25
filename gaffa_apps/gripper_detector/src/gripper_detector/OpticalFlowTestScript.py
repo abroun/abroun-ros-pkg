@@ -13,6 +13,7 @@ import os.path
 import time
 import copy
 from optparse import OptionParser
+import gc
 
 import numpy as np
 import cv
@@ -67,7 +68,8 @@ class WorkingData:
         
 #-------------------------------------------------------------------------------
 def evaluateClassifier( markerFilename, bagFilenames, 
-                        rocGraphFilename = None, accuracyGraphFilename = None ):
+                        rocGraphFilename = None, accuracyGraphFilename = None,
+                        gaussianStdDev = 0.0 ):
     '''Takes a list of bag files in as data for the classifier and evaluates
        the classifer against a ground truth marker file. Returns the average AUC
        and optimal threshold for the classifier.'''
@@ -76,8 +78,6 @@ def evaluateClassifier( markerFilename, bagFilenames,
     markerBuffer = MarkerBuffer.loadMarkerBuffer( markerFilename )
     if markerBuffer == None:
         print "Error: Unable to load marker buffer -", markerFilename
-
-    GAUSSIAN_STD_DEV = 0.0
 
     # Process each bag file in turn
     dataList = []
@@ -93,8 +93,8 @@ def evaluateClassifier( markerFilename, bagFilenames,
         #print "Resampling data"
         regularisedInputSequence = RegularisedInputSequence( 
             inputSequence, SAMPLES_PER_SECOND )
-        if GAUSSIAN_STD_DEV > 0.0:
-            regularisedInputSequence.smoothOpticalFlow( GAUSSIAN_STD_DEV )
+        if gaussianStdDev > 0.0:
+            regularisedInputSequence.smoothOpticalFlow( gaussianStdDev )
 
         #print "Performing cross correlation"
         crossCorrelatedSequence = CrossCorrelatedSequence( 
@@ -233,17 +233,24 @@ if options.evaluateVariableNumWaves:
     MAX_NUM_WAVES = 9
     waveNumList = range( 1, MAX_NUM_WAVES + 1 )
     
-    results = []
+    #smoothingStdDevs = [ 1.0, 1.5, 2.0, 3.0, 4.0, 5.0 ]
+    smoothingStdDevs = [ 5.0 ]
     
-    for waveNum in waveNumList:
-        bagFilenames = [ "VarWave_{0:02}_{1:02}_Waves.bag".format( testIdx, waveNum ) for testIdx in range( 1, 6 ) ]
+    for gaussianStdDev in smoothingStdDevs:
+        results = []
         
-        averageAreaUnderCurve, maxAccuracyThreshold = \
-            evaluateClassifier( markerFilename, bagFilenames )
+        for waveNum in waveNumList:
+            bagFilenames = [ "VarWave_{0:02}_{1:02}_Waves.bag".format( testIdx, waveNum ) for testIdx in range( 1, 6 ) ]
+            
+            averageAreaUnderCurve, maxAccuracyThreshold = \
+                evaluateClassifier( markerFilename, bagFilenames, 
+                    gaussianStdDev=gaussianStdDev )
+            
+            results.append( ( waveNum, averageAreaUnderCurve, maxAccuracyThreshold ) )
+            gc.collect()
         
-        results.append( ( waveNum, averageAreaUnderCurve, maxAccuracyThreshold ) )
-    
-    print results
+        print "GaussianStdDev =", gaussianStdDev
+        print results
 else:
     if len( args ) < 2:
         print "Error: Not enough arguments supplied"
