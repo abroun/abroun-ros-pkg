@@ -69,9 +69,9 @@ class MainWindow:
     #GROUND_TRUTH_FILENAME = "/../../config/TopPosGripper.yaml"
     #GROUND_TRUTH_FILENAME = "/../../config/ExperimentPosGripper.yaml"
     #GROUND_TRUTH_FILENAME = "/../../config/OnTablePosGripper.yaml"
-    GROUND_TRUTH_FILENAME = "/../../config/BasicWave_Gripper.yaml"
+    GROUND_TRUTH_FILENAME = "/../../config/TightBasicWave_Gripper.yaml"
     
-    CORRELATION_THRESHOLD = 0.6
+    CORRELATION_THRESHOLD = 0.45
     MAX_TEST_POINT_X = (320 - OPTICAL_FLOW_BLOCK_WIDTH)/OPTICAL_FLOW_BLOCK_WIDTH - 1
     MAX_TEST_POINT_Y = (240 - OPTICAL_FLOW_BLOCK_HEIGHT)/OPTICAL_FLOW_BLOCK_HEIGHT - 1
     
@@ -101,7 +101,7 @@ class MainWindow:
             Distractor( radius=24, startPos=( 188, 130 ), endPos=( 168, 258 ), frequency=0.6 ),
             Distractor( radius=24, startPos=( 63, 94 ), endPos=( 170, 81 ), frequency=1.5 ),
             Distractor( radius=24, startPos=( 40, 287 ), endPos=( 50, 197 ), frequency=3.0 ) ]
-        self.inputSequence.addDistractorObjects( distractors )
+        #self.inputSequence.addDistractorObjects( distractors )
         
         self.inputSequence.calculateOpticalFlow(
             self.OPTICAL_FLOW_BLOCK_WIDTH, self.OPTICAL_FLOW_BLOCK_HEIGHT,
@@ -382,6 +382,10 @@ class MainWindow:
             # Draw an overlay to show places where the input motion has been detected
             if self.inputSignalDetectedArray != None:
                 
+                imageData = np.frombuffer( self.cameraImagePixBuf.get_pixels(), dtype=np.uint8 )
+                imageData.shape = ( self.cameraImagePixBuf.get_height(), 
+                    self.cameraImagePixBuf.get_width(), 3 )
+                
                 graphicsContext = widget.window.new_gc()
                 graphicsContext.set_rgb_fg_color( gtk.gdk.Color( 65535, 65535, 0 ) )
                 
@@ -392,10 +396,26 @@ class MainWindow:
                     for x in range( self.inputSignalDetectedArray.shape[ 1 ] ):
                         
                         if self.inputSignalDetectedArray[ y, x ]:
-                            points = [ (blockX+int((i*2)%self.OPTICAL_FLOW_BLOCK_WIDTH), blockY+2*int((i*2)/self.OPTICAL_FLOW_BLOCK_WIDTH)) \
-                                for i in range( self.OPTICAL_FLOW_BLOCK_WIDTH*self.OPTICAL_FLOW_BLOCK_HEIGHT/4 ) ]
+                            
+                            # Get source block as NumPy array
+                            srcX = blockX - imgRect.x
+                            srcY = blockY - imgRect.y
+                            srcData = imageData[ srcY:srcY+self.OPTICAL_FLOW_BLOCK_HEIGHT,
+                                srcX:srcX+self.OPTICAL_FLOW_BLOCK_WIDTH, : ]
+                                                            
+                            # Create a modified version of the block with a yellow layer
+                            # alpha blended over the top
+                            yellowLayer = np.ones( ( self.OPTICAL_FLOW_BLOCK_WIDTH, 
+                                self.OPTICAL_FLOW_BLOCK_HEIGHT, 3 ) )*[255.0,255.0,0.0]*0.5
+                            modifiedData = ( srcData.astype( np.float32 )*0.5 + yellowLayer ).astype( np.uint8 )
+                            
+                            # Blit the modified version into the widget
+                            modifiedPixBuf = gtk.gdk.pixbuf_new_from_array( 
+                                modifiedData, gtk.gdk.COLORSPACE_RGB, 8 )
                                 
-                            widget.window.draw_points( graphicsContext, points )
+                            widget.window.draw_pixbuf( widget.get_style().fg_gc[ gtk.STATE_NORMAL ],
+                                modifiedPixBuf, 0, 0, blockX, blockY, 
+                                self.OPTICAL_FLOW_BLOCK_WIDTH, self.OPTICAL_FLOW_BLOCK_HEIGHT )
                             
                         blockX += self.OPTICAL_FLOW_BLOCK_WIDTH
                         

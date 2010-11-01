@@ -257,7 +257,11 @@ class MainWindow:
               
             # Draw an overlay to show active marker squares
             if self.markerBuffer != None:
-                    
+                
+                imageData = np.frombuffer( self.cameraImagePixBuf.get_pixels(), dtype=np.uint8 )
+                imageData.shape = ( self.cameraImagePixBuf.get_height(), 
+                    self.cameraImagePixBuf.get_width(), 3 )
+                
                 graphicsContext = widget.window.new_gc()
                 graphicsContext.set_rgb_fg_color( gtk.gdk.Color( 65535, 65535, 0 ) )
                 
@@ -268,10 +272,26 @@ class MainWindow:
                     for x in range( self.markerBuffer.shape[ 1 ] ):
                         
                         if self.markerBuffer[ y, x ]:
-                            points = [ (blockX+int((i*2)%self.opticalFlowBlockWidth), blockY+2*int((i*2)/self.opticalFlowBlockWidth)) \
-                                for i in range( int(self.opticalFlowBlockWidth*self.opticalFlowBlockHeight/4) ) ]
+                            
+                            # Get source block as NumPy array
+                            srcX = blockX - imgRect.x
+                            srcY = blockY - imgRect.y
+                            srcData = imageData[ srcY:srcY+self.opticalFlowBlockHeight,
+                                srcX:srcX+self.opticalFlowBlockWidth, : ]
+                                                            
+                            # Create a modified version of the block with a yellow layer
+                            # alpha blended over the top
+                            yellowLayer = np.ones( ( self.opticalFlowBlockWidth, 
+                                self.opticalFlowBlockHeight, 3 ) )*[255.0,255.0,0.0]*0.5
+                            modifiedData = ( srcData.astype( np.float32 )*0.5 + yellowLayer ).astype( np.uint8 )
+                            
+                            # Blit the modified version into the widget
+                            modifiedPixBuf = gtk.gdk.pixbuf_new_from_array( 
+                                modifiedData, gtk.gdk.COLORSPACE_RGB, 8 )
                                 
-                            widget.window.draw_points( graphicsContext, points )
+                            widget.window.draw_pixbuf( widget.get_style().fg_gc[ gtk.STATE_NORMAL ],
+                                modifiedPixBuf, 0, 0, blockX, blockY, 
+                                self.opticalFlowBlockWidth, self.opticalFlowBlockHeight )
                             
                         blockX += self.opticalFlowBlockWidth
                         

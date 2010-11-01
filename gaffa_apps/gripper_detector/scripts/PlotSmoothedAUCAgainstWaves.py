@@ -47,9 +47,9 @@ axisPlot = figurePlot.add_subplot( 111 )
 legendKeys = []
 for stdDev in dataDic:
     legendKeys.append( stdDev )
-    axisPlot.plot( numWavesData, dataDic[ stdDev ] ) #, 'x' )
+    axisPlot.plot( numWavesData, dataDic[ stdDev ], '-x' )
     
-axisPlot.legend( legendKeys, loc=4 )
+axisPlot.legend( legendKeys, loc=4, title='Gaussian $\sigma$' )
 
 axisPlot.set_xlim( 0.5, numWaves + 0.5 )
 axisPlot.set_xticks( numWavesData )
@@ -58,5 +58,5 @@ axisPlot.set_xlabel( 'Num Waves' )
 axisPlot.set_ylabel( 'AUC' )
 
 # Save the graph
-figurePlot.savefig( "AUCvsNumWaves.png" )
+figurePlot.savefig( "SmoothedAUCvsNumWaves.eps" )
     

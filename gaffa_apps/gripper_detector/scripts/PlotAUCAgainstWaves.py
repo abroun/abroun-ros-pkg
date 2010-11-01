@@ -36,7 +36,7 @@ figurePlot = Figure( figsize=(8,6), dpi=72 )
 canvas = FigureCanvas( figurePlot )
 axisPlot = figurePlot.add_subplot( 111 )
 
-axisPlot.plot( numWavesData, aucData, 'x' )
+axisPlot.plot( numWavesData, aucData, '-x' )
 axisPlot.set_xlim( 0.5, len( aucData ) + 0.5 )
 axisPlot.set_xticks( numWavesData )
 
@@ -44,5 +44,5 @@ axisPlot.set_xlabel( 'Num Waves' )
 axisPlot.set_ylabel( 'AUC' )
 
 # Save the graph
-figurePlot.savefig( "AUCvsNumWaves.png" )
+figurePlot.savefig( "AUCvsNumWaves.eps" )
     
