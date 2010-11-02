@@ -143,7 +143,7 @@ def evaluateClassifier( markerFilename, bagFilenames,
     # Add error bars
     if varianceROCCurve != None:
         
-        diffBetweenErrorBars = 0.05 #1.0/(NUM_ERROR_BARS)
+        diffBetweenErrorBars = 0.025 #1.0/(NUM_ERROR_BARS)
         lastFPRValue = averageROCCurve.falsePositiveRates[ 0 ]
         
         errorFPR = []
