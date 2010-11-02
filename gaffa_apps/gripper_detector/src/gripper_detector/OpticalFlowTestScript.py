@@ -114,6 +114,8 @@ def evaluateClassifier( markerFilename, bagFilenames,
         #print "Building ROC Curve"
         rocCurve = GripperDetectorROCCurve( crossCorrelatedSequence, markerBuffer )
         
+        print "__AUC =", rocCurve.areaUnderCurve
+        
         dataList.append( WorkingData( bagFilename, inputSequence, 
             regularisedInputSequence, crossCorrelatedSequence, rocCurve ) )
         
@@ -141,7 +143,7 @@ def evaluateClassifier( markerFilename, bagFilenames,
     # Add error bars
     if varianceROCCurve != None:
         
-        diffBetweenErrorBars = 0.05 #1.0/(NUM_ERROR_BARS)
+        diffBetweenErrorBars = 0.025 #1.0/(NUM_ERROR_BARS)
         lastFPRValue = averageROCCurve.falsePositiveRates[ 0 ]
         
         errorFPR = []
@@ -272,8 +274,8 @@ else:
 
     averageAreaUnderCurve, maxAccuracyThreshold = evaluateClassifier( 
         markerFilename, bagFilenames,
-        rocGraphFilename = options.outputPrefix + "ROC.png",
-        accuracyGraphFilename = options.outputPrefix + "Accuracy.png" )
+        rocGraphFilename = options.outputPrefix + "ROC.eps",
+        accuracyGraphFilename = options.outputPrefix + "Accuracy.eps" )
 
     # Display AUC
     print "AUC =", averageAreaUnderCurve
