@@ -231,6 +231,8 @@ class MainWindow:
         pixelClassText = self.comboPixelClass.get_active_text()
         if pixelClassText == "Background":
             return self.GC_BGD
+        elif pixelClassText == "Probably Foreground":
+            return self.GC_PR_FGD
         else:
             return self.GC_FGD
         
