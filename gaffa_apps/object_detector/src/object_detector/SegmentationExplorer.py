@@ -18,6 +18,8 @@ import pygtk
 pygtk.require('2.0')
 import gtk
 import gobject
+from ResidualSaliencyFilter import ResidualSaliencyFilter
+import PyBlobLib
 
 #-------------------------------------------------------------------------------
 class Display:
@@ -147,6 +149,7 @@ class MainWindow:
         self.image = None
         self.maskArray = None
         self.filename = None
+        self.residualSaliencyFilter = ResidualSaliencyFilter()
             
         # Setup the GUI        
         builder = gtk.Builder()
@@ -344,6 +347,60 @@ class MainWindow:
             self.segmentation = np.copy( self.image )
             self.segmentation[ (workingMask != self.GC_PR_FGD) & (workingMask != self.GC_FGD) ] = 0
             self.dwgSegmentationDisplay.setImageFromNumpyArray( self.segmentation )
+    
+    #---------------------------------------------------------------------------
+    def onBtnCreateSaliencyMaskClicked( self, widget ):
+        
+        ROI_X = 0
+        ROI_Y = 76
+        ROI_WIDTH = 230
+        ROI_HEIGHT = 100
+        
+        #ROI_WIDTH = 10
+        
+        if self.image != None:
+            
+            # Create a saliency map from the current image
+            grayImage = np.ndarray( ( self.image.height, self.image.width ), dtype=np.uint8 )
+            cv.CvtColor( self.image, grayImage, cv.CV_RGB2GRAY )
+            
+            saliencyMap, largeSaliencyMap = self.residualSaliencyFilter.calcSaliencyMap( grayImage )
+        
+            # Threshold to get blobs
+            blobPixels = largeSaliencyMap >= 160
+            largeSaliencyMap[ blobPixels ] = 255
+            largeSaliencyMap[ blobPixels == False ] = 0
+            
+            # Label blobs
+            largeSaliencyMap, numBlobs = PyBlobLib.labelBlobs( largeSaliencyMap )
+            
+            # Find blobs in the region of interest
+            testMap = np.copy( largeSaliencyMap )
+            testMap[ :ROI_Y, : ] = 0       # Mask out area above the ROI
+            testMap[ :, :ROI_X ] = 0       # Mask out area to the left of the ROI
+            testMap[ ROI_Y+ROI_HEIGHT: ] = 0   # Mask out area below the ROI
+            testMap[ :, ROI_X+ROI_WIDTH: ] = 0   # Mask out area to the right of the ROI
+        
+            biggestBlobIdx = None
+            biggestBlobSize = 0
+        
+            for blobIdx in range( 1, numBlobs + 1 ):
+                if testMap[ testMap == blobIdx ].size > 0:
+                    blobSize = largeSaliencyMap[ largeSaliencyMap == blobIdx ].size
+                    if blobSize > biggestBlobSize:
+                        biggestBlobSize = blobSize
+                        biggestBlobIdx = blobIdx
+        
+            # Isolate the largest blob
+            if biggestBlobIdx != None:
+                biggestBlobPixels = (largeSaliencyMap == biggestBlobIdx)
+                print biggestBlobPixels.size
+                largeSaliencyMap[ biggestBlobPixels ] = self.GC_PR_FGD
+                largeSaliencyMap[ biggestBlobPixels == False ] = self.GC_PR_BGD
+        
+                # Use the largest blob as the segmentation mask
+                self.maskArray = largeSaliencyMap
+                self.redrawImageWithMask()
             
     #---------------------------------------------------------------------------
     def onComboBrushTypeChanged( self, widget ):
