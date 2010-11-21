@@ -19,11 +19,14 @@ import gobject
 import sensor_msgs.msg
 from maplin_arm.ROS_ArmClient import ROS_ArmClient
 from maplin_arm.ArmDriver import MotorStates
+import cv
 
 #-------------------------------------------------------------------------------
 class MainWindow:
 
     BASE_MOTOR_IDX = 0
+    SHOULDER_MOTOR_IDX = 1
+    ELBOW_MOTOR_IDX = 2
     WRIST_MOTOR_IDX = 3
 
     #---------------------------------------------------------------------------
@@ -31,6 +34,7 @@ class MainWindow:
     
         self.scriptPath = os.path.dirname( __file__ )
         self.cameraImagePixBuf = None
+        self.lastImage = None
             
         # Connect to the robot via ROS
         rospy.init_node( 'MaplinArmTeleop', anonymous=True )
@@ -43,6 +47,10 @@ class MainWindow:
         self.downButtonPressed = False
         self.leftButtonPressed = False
         self.rightButtonPressed = False
+        self.shoulderUpButtonPressed = False
+        self.shoulderDownButtonPressed = False
+        self.elbowUpButtonPressed = False
+        self.elbowDownButtonPressed = False
         
         self.guideImagePixBuf = None
             
@@ -119,6 +127,22 @@ class MainWindow:
         self.rightButtonPressed = True
         
     #---------------------------------------------------------------------------
+    def onBtnShoulderUpPressed( self, widget ):
+        self.shoulderUpButtonPressed = True
+        
+    #---------------------------------------------------------------------------
+    def onBtnShoulderDownPressed( self, widget ):
+        self.shoulderDownButtonPressed = True
+        
+    #---------------------------------------------------------------------------
+    def onBtnElbowUpPressed( self, widget ):
+        self.elbowUpButtonPressed = True
+        
+    #---------------------------------------------------------------------------
+    def onBtnElbowDownPressed( self, widget ):
+        self.elbowDownButtonPressed = True
+        
+    #---------------------------------------------------------------------------
     def onBtnUpReleased( self, widget ):
         self.upButtonPressed = False
         
@@ -133,6 +157,47 @@ class MainWindow:
     #---------------------------------------------------------------------------
     def onBtnRightReleased( self, widget ):
         self.rightButtonPressed = False
+        
+    #---------------------------------------------------------------------------
+    def onBtnShoulderUpReleased( self, widget ):
+        self.shoulderUpButtonPressed = False
+        
+    #---------------------------------------------------------------------------
+    def onBtnShoulderDownReleased( self, widget ):
+        self.shoulderDownButtonPressed = False
+        
+    #---------------------------------------------------------------------------
+    def onBtnElbowUpReleased( self, widget ):
+        self.elbowUpButtonPressed = False
+        
+    #---------------------------------------------------------------------------
+    def onBtnElbowDownReleased( self, widget ):
+        self.elbowDownButtonPressed = False
+    
+    #---------------------------------------------------------------------------    
+    def onBtnSaveImageClicked( self, widget ):
+        
+        if self.lastImage != None:
+            # Convert to an OpenCV image
+            cvImage = cv.CreateMatHeader( self.lastImage.height, self.lastImage.width, cv.CV_8UC3 )
+            cv.SetData( cvImage, self.lastImage.data, self.lastImage.step )
+            
+            # Convert to BGR as OpenCV likes it
+            cv.CvtColor( cvImage, cvImage, cv.CV_RGB2BGR )
+            
+            # Find a name for the image
+            nameFormatString = "/home/abroun/abroun-ros-pkg/gaffa_apps/object_detector/test_data/saliency/maplin_{0}.png"
+            imageIdx = 0
+            nameFound = False
+            while not nameFound:
+                imageName = nameFormatString.format( imageIdx )
+                if not os.path.exists( imageName ):
+                    nameFound = True
+                else:
+                    imageIdx += 1
+            
+            # Save the image
+            cv.SaveImage( imageName, cvImage );
     
     #---------------------------------------------------------------------------
     def onDwgCameraImageExposeEvent( self, widget, data = None ):
@@ -229,12 +294,24 @@ class MainWindow:
                 
                 # Work out whether the motors should be off or going forward/backwards
                 baseMotorState = MotorStates.OFF
+                shoulderMotorState = MotorStates.OFF
+                elbowMotorState = MotorStates.OFF
                 wristMotorState = MotorStates.OFF
                 
                 if self.leftButtonPressed and not self.rightButtonPressed:
                     baseMotorState = MotorStates.BACKWARD
                 elif self.rightButtonPressed and not self.leftButtonPressed:
                     baseMotorState = MotorStates.FORWARD
+                    
+                if self.shoulderUpButtonPressed and not self.shoulderDownButtonPressed:
+                    shoulderMotorState = MotorStates.FORWARD
+                elif self.shoulderDownButtonPressed and not self.shoulderUpButtonPressed:
+                    shoulderMotorState = MotorStates.BACKWARD
+                    
+                if self.elbowUpButtonPressed and not self.elbowDownButtonPressed:
+                    elbowMotorState = MotorStates.FORWARD
+                elif self.elbowDownButtonPressed and not self.elbowUpButtonPressed:
+                    elbowMotorState = MotorStates.BACKWARD
                     
                 if self.upButtonPressed and not self.downButtonPressed:
                     wristMotorState = MotorStates.FORWARD
@@ -244,6 +321,8 @@ class MainWindow:
                 # Send the motor states to the arm
                 self.rosArmClient.setArmMotorStates(
                     [ ( self.BASE_MOTOR_IDX, baseMotorState ),
+                    ( self.SHOULDER_MOTOR_IDX, shoulderMotorState ),
+                    ( self.ELBOW_MOTOR_IDX, elbowMotorState ),
                     ( self.WRIST_MOTOR_IDX, wristMotorState ) ] )                      
 
                 # Save the update time

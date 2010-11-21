@@ -6,7 +6,7 @@ import numpy as np
 class MotionDetectionFilter:
     
     NUM_FRAMES_IN_MODEL = 10
-    MINIMUM_MODEL_STD_DEV = 0.2
+    MINIMUM_MODEL_STD_DEV = 0.8
     
     #---------------------------------------------------------------------------
     def __init__( self ):
@@ -61,7 +61,9 @@ class MotionDetectionFilter:
             
             # Have a minimum value for the standard deviation so that we don't have
             # highly sensitive pixels
-            stdDev[ stdDev < self.MINIMUM_MODEL_STD_DEV ] = self.MINIMUM_MODEL_STD_DEV
+            print "MaxStdDev", np.max( stdDev )
+            stdDev[ stdDev < self.MINIMUM_MODEL_STD_DEV ] = 3.0 #self.MINIMUM_MODEL_STD_DEV
+            stdDev[ stdDev > self.MINIMUM_MODEL_STD_DEV ] = 3.0
             
             self.pixelLowerThreshold = 10.0*stdDev
             self.pixelUpperThreshold = 25.0*stdDev
@@ -89,6 +91,6 @@ class MotionDetectionFilter:
             np.clip( prob, 0.0, 255.0, prob )
             motionImage = np.array( prob, dtype=np.uint8 )
             
-            self.pixelMean = np.array( imageGray, dtype=np.int32 )
+            self.pixelMean = np.copy( imageGray ).astype( np.int32 )
     
         return motionImage

@@ -11,7 +11,7 @@ class ImageFlowFilter:
        Differences (SSD) measure"""
     
     TRANSLATION_STEP = 1
-    MAX_NUM_TRANSLATION_STEPS = 3
+    MAX_NUM_TRANSLATION_STEPS = 64
     ROTATION_STEP_ANGLE = math.radians( 0.5 ) 
     MAX_NUM_ROTATION_STEPS = 10
 
@@ -50,11 +50,13 @@ class ImageFlowFilter:
         rotationAngle = 0
         bestTransformedImage = None
         
+        SCALE = 0.25
+        
         smallTargetImageGray = scipy.ndimage.interpolation.zoom( 
-            targetImageGray, 0.25 ).astype( np.int32 )
+            targetImageGray, SCALE ).astype( np.int32 )
             
         smallTemplateImageGray = scipy.ndimage.interpolation.zoom( 
-                templateImageGray, 0.25 ).astype( np.int32 )
+                templateImageGray, SCALE ).astype( np.int32 )
         
         imageWidth = smallTemplateImageGray.shape[ 1 ]
         imageHeight = smallTemplateImageGray.shape[ 0 ]
@@ -63,9 +65,9 @@ class ImageFlowFilter:
         # Try all possible translations
         minSSD = None
         translationOffsetArray = np.arange( 
-            -self.MAX_NUM_TRANSLATION_STEPS*self.TRANSLATION_STEP, 
-            (self.MAX_NUM_TRANSLATION_STEPS + 1)*self.TRANSLATION_STEP,
-            self.TRANSLATION_STEP )
+            -self.MAX_NUM_TRANSLATION_STEPS*self.TRANSLATION_STEP*SCALE, 
+            (self.MAX_NUM_TRANSLATION_STEPS + 1)*self.TRANSLATION_STEP*SCALE,
+            self.TRANSLATION_STEP*SCALE )
         for xOffset in translationOffsetArray:
             for yOffset in translationOffsetArray:
                 
@@ -100,8 +102,10 @@ class ImageFlowFilter:
                     bestTransformedImage = np.copy( transformedImage )
                     minSSD = transformSSD
         
+        transX *= (1.0/SCALE)
+        transY *= (1.0/SCALE)
         newImage = scipy.ndimage.interpolation.shift( 
-                    templateImageGray, ( 4.0*transY, 4.0*transX ) )
+                    templateImageGray, ( transY, transX ) )
         
         #newImage = bestTransformedImage
         #newImage = np.array( 

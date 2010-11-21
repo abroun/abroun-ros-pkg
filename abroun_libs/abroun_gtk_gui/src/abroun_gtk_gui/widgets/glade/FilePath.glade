@@ -11,6 +11,7 @@
             <property name="visible">True</property>
             <property name="can_focus">True</property>
             <property name="invisible_char">&#x2022;</property>
+            <signal name="changed" handler="onTbxFileChanged"/>
           </object>
           <packing>
             <property name="position">0</property>

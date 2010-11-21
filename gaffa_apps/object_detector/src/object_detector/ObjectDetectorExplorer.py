@@ -30,131 +30,13 @@ from matplotlib.backends.backend_gtkagg import FigureCanvasGTKAgg as FigureCanva
 from matplotlib.backends.backend_gtkagg import NavigationToolbar2GTKAgg as NavigationToolbar
 
 from abroun_gtk_gui.widgets import SequenceControl
+from abroun_gtk_gui.Display import Display
 from gripper_detector.OpticalFlowFilter import OpticalFlowFilter
 from MotionDetectionFilter import MotionDetectionFilter
 from ImageFlowFilter import ImageFlowFilter
 from ResidualSaliencyFilter import ResidualSaliencyFilter
 
 import PyBlobLib
-
-#-------------------------------------------------------------------------------
-class Display:
-    '''A combination of a pixBuf and the drawing area that is used to
-       to display it'''
-    
-    #---------------------------------------------------------------------------
-    def __init__( self, drawingArea ):
-        
-        self.drawingArea = drawingArea
-        self.pixBuf = None
-        
-    #---------------------------------------------------------------------------
-    def setImageFromOpenCVMatrix( self, cvMtx ):
-        
-        width = cvMtx.width
-        height = cvMtx.height
-        
-        if cvMtx.channels == 1:
-            # Convert grayscale image to RGB
-            cvMtxRGB = cv.CreateMat( height, width, cv.CV_8UC3 )
-            cv.CvtColor( cvMtx, cvMtxRGB, cv.CV_GRAY2RGB )
-            data = cvMtxRGB.tostring()
-        else:
-            data = cvMtx.tostring()
-        
-        self.setImage( width, height, data )
-        
-    #---------------------------------------------------------------------------
-    def setImageFromNumpyArray( self, imageArray ):
-        
-        width = imageArray.shape[ 1 ]
-        height = imageArray.shape[ 0 ]
-        
-        if len( imageArray.shape ) < 3 or imageArray.shape[ 2 ] == 1:
-            # Convert grayscale image to RGB
-            imageArrayRGB = np.ndarray( ( height, width, 3 ), dtype=np.uint8 )
-            imageArrayRGB[ :, :, 0 ] = imageArray
-            imageArrayRGB[ :, :, 1 ] = imageArray
-            imageArrayRGB[ :, :, 2 ] = imageArray
-            data = imageArrayRGB.tostring()
-        else:
-            data = imageArray.tostring()
-        
-        self.setImage( width, height, data )
-        
-    #---------------------------------------------------------------------------
-    def setImage( self, width, height, data ):
-        
-        # Display the image
-        self.pixBuf = gtk.gdk.pixbuf_new_from_data( 
-            data, 
-            gtk.gdk.COLORSPACE_RGB,
-            False,
-            8,
-            width,
-            height,
-            width*3 )
-            
-        # Resize the drawing area if necessary
-        if self.drawingArea.get_size_request() != ( width, height ):
-            self.drawingArea.set_size_request( width, height )
-
-        self.drawingArea.queue_draw()
-        
-    #---------------------------------------------------------------------------
-    def queueDraw( self ):
-        self.drawingArea.queue_draw()
-        
-    #---------------------------------------------------------------------------
-    def drawPixBufToDrawingArea( self, redrawArea ):
-        '''Draws the PixBuf to the drawing area. If successful then it returns
-           the image rectange that was drawn to so that futher drawing can be
-           done. Otherwise it returns None'''
-        
-        imgRect = self.getImageRectangleInWidget( self.drawingArea )
-        if imgRect != None:
-            imgOffsetX = imgRect.x
-            imgOffsetY = imgRect.y
-                
-            # Get the total area that needs to be redrawn
-            redrawRect = imgRect.intersect( redrawArea )
-        
-            srcX = redrawRect.x - imgOffsetX
-            srcY = redrawRect.y - imgOffsetY
-           
-            self.drawingArea.window.draw_pixbuf( 
-                self.drawingArea.get_style().fg_gc[ gtk.STATE_NORMAL ],
-                self.pixBuf, srcX, srcY, 
-                redrawRect.x, redrawRect.y, redrawRect.width, redrawRect.height )
-        
-        return imgRect
-         
-    #---------------------------------------------------------------------------
-    def getImageRectangleInWidget( self, widget ):
-        '''Returns a rectangle for drawing the contents of the PixBuf centred
-           in the middle of the given widget. If no PixBuf has been set yet then
-           this routine returns None'''
-        
-        if self.pixBuf == None:
-            return None
-        else:
-            imageWidth = self.pixBuf.get_width()
-            imageHeight = self.pixBuf.get_height()
-        
-            # Centre the image inside the widget
-            widgetX, widgetY, widgetWidth, widgetHeight = widget.get_allocation()
-        
-            imgRect = gtk.gdk.Rectangle( 0, 0, widgetWidth, widgetHeight )
-        
-            if widgetWidth > imageWidth:
-                imgRect.x = (widgetWidth - imageWidth) / 2
-                imgRect.width = imageWidth
-            
-            if widgetHeight > imageHeight:
-                imgRect.y = (widgetHeight - imageHeight) / 2
-                imgRect.height = imageHeight
-        
-            return imgRect
 
 #-------------------------------------------------------------------------------
 class OutputMode:
@@ -218,8 +100,8 @@ class MainWindow:
         
         builder.connect_signals( self )
                
-        updateLoop = self.update()
-        gobject.idle_add( updateLoop.next )
+        #updateLoop = self.update()
+        #gobject.idle_add( updateLoop.next )
         
         self.window.show()
         
@@ -234,6 +116,7 @@ class MainWindow:
     def main( self ):
         # All PyGTK applications must have a gtk.main(). Control ends here
         # and waits for an event to occur (like a key press or mouse event).
+        gtk.gdk.threads_init()
         gtk.main()
         
     #---------------------------------------------------------------------------
@@ -482,6 +365,8 @@ class MainWindow:
     #---------------------------------------------------------------------------
     def processBag( self, bag ):
     
+        FLIP_IMAGE = True
+    
         bagFrameIdx = 0
         frameIdx = 0
         impactFrameIdx = None
@@ -513,6 +398,9 @@ class MainWindow:
                 # Get input image
                 image = cv.CreateMatHeader( msg.height, msg.width, cv.CV_8UC3 )
                 cv.SetData( image, msg.data, msg.step )
+                
+                if FLIP_IMAGE:
+                    cv.Flip( image, None, 1 )
                 
                 # Convert to grayscale
                 grayImage = cv.CreateMat( msg.height, msg.width, cv.CV_8UC1 )
@@ -553,21 +441,28 @@ class MainWindow:
                         impactFrameIdx = frameIdx
                     
                 else:
-                    if frameIdx - impactFrameIdx == FRAMES_BACK:
+                    PROCESS_IMPACT = False
+                    if PROCESS_IMPACT and frameIdx - impactFrameIdx == FRAMES_BACK:
                         
                         # Should now have enough info to segment object
                         impactMotionImage = self.motionImageList[ impactFrameIdx ]
                         
+                        print "Aligning"
                         postImpactRealFarFlow = imageFlowFilter.calcImageFlow( impactMotionImage, motionImage )
+                        print "Aligning"
                         postImpactFarFlow = imageFlowFilter.calcImageFlow( impactMotionImage, self.motionImageList[ impactFrameIdx + 2 ] )
+                        print "Aligning"
                         postImpactNearFlow = imageFlowFilter.calcImageFlow( impactMotionImage, self.motionImageList[ impactFrameIdx + 1 ] )
                         
                         segmentationMask = np.maximum( np.maximum( np.maximum( 
                             impactMotionImage, postImpactNearFlow[ 3 ] ), postImpactFarFlow[ 3 ] ), postImpactRealFarFlow[ 3 ] )
                         cv.Dilate( segmentationMask, segmentationMask )
                         
+                        print "Aligning"
                         preImpactRealFarFlow = imageFlowFilter.calcImageFlow( impactMotionImage, self.motionImageList[ impactFrameIdx - 8 ] )
+                        print "Aligning"
                         preImpactFarFlow = imageFlowFilter.calcImageFlow( impactMotionImage, self.motionImageList[ impactFrameIdx - 6 ] )
+                        print "Aligning"
                         preImpactNearFlow = imageFlowFilter.calcImageFlow( impactMotionImage, self.motionImageList[ impactFrameIdx - 4 ] )
                         
                         subMask = np.maximum( np.maximum( 
@@ -759,7 +654,7 @@ class MainWindow:
                 
                     
                     black = (workingMask != self.GC_PR_FGD) & (workingMask != self.GC_FGD)
-                    motionImage = np.where( black, 0, 255 ).astype( np.uint8 )
+                    #motionImage = np.where( black, 0, 255 ).astype( np.uint8 )
                     
                     # Refine the segmentation
                     REFINE_SEG = False
@@ -813,9 +708,9 @@ class MainWindow:
                 self.numFramesProcessed += 1
                 
         if not self.workCancelled:
-            self.refreshGraphDisplay()
             
-            SAVE_MOTION_IMAGES = False
+            
+            SAVE_MOTION_IMAGES = True
             BASE_MOTION_IMAGE_NAME = self.scriptPath + "/../../test_data/motion_images/motion_{0:03}.png"
             
             if SAVE_MOTION_IMAGES and len( self.motionImageList ) > 0:
@@ -832,6 +727,46 @@ class MainWindow:
                     
                     outputName = BASE_MOTION_IMAGE_NAME.format( frameIdx + 1 )
                     cv.SaveImage( outputName, colourImage )
+            
+            if impactFrameIdx != None:
+                
+                NUM_FRAMES_BEFORE = 8
+                BASE_MOTION_IMAGE_NAME = self.scriptPath + "/../../test_data/impact_images/motion_{0:03}.png"
+                START_MOTION_IMAGE_NAME = self.scriptPath + "/../../test_data/impact_images/start_motion.png"
+                START_IMAGE_NAME = self.scriptPath + "/../../test_data/impact_images/start.png"
+                IMPACT_IMAGE_NAME = self.scriptPath + "/../../test_data/impact_images/impact.png"
+                NUM_FRAMES_AFTER = 3
+                
+                width = self.motionImageList[ 0 ].shape[ 1 ]
+                height = self.motionImageList[ 0 ].shape[ 0 ]
+                colourImage = np.zeros( ( height, width, 3 ), dtype=np.uint8 )
+                
+                for frameIdx in range( impactFrameIdx - NUM_FRAMES_BEFORE,
+                    impactFrameIdx + NUM_FRAMES_AFTER + 1 ):
+                    
+                    motionImage = self.motionImageList[ frameIdx ]  
+                    colourImage[ :, :, 0 ] = motionImage
+                    colourImage[ :, :, 1 ] = motionImage
+                    colourImage[ :, :, 2 ] = motionImage
+                    
+                    outputName = BASE_MOTION_IMAGE_NAME.format( frameIdx - impactFrameIdx )
+                    cv.SaveImage( outputName, colourImage )
+                
+                motionDetectionFilter.calcMotion( self.grayScaleImageList[ 0 ] )
+                startMotionImage = motionDetectionFilter.calcMotion( 
+                    self.grayScaleImageList[ impactFrameIdx ] )
+                colourImage[ :, :, 0 ] = startMotionImage
+                colourImage[ :, :, 1 ] = startMotionImage
+                colourImage[ :, :, 2 ] = startMotionImage  
+                cv.SaveImage( START_MOTION_IMAGE_NAME, colourImage )
+                
+                cv.CvtColor( self.inputImageList[ 0 ], colourImage, cv.CV_RGB2BGR )    
+                cv.SaveImage( START_IMAGE_NAME, colourImage )
+                cv.CvtColor( self.inputImageList[ impactFrameIdx ], colourImage, cv.CV_RGB2BGR )    
+                cv.SaveImage( IMPACT_IMAGE_NAME, colourImage )
+                    
+            self.refreshGraphDisplay()
+            
             
         print "Finished processing bag file"
         

@@ -1,0 +1,19 @@
+<launch>
+
+  <!-- SSC32 Server -->
+  <node name="ssc32_server" pkg="lynxmotion_arm" type="ROS_SSC32Server.py" respawn="false">
+    <rosparam ns="servoConfigData" file="$(find gaffa_bringup)/config/ServoConfig.yaml" command="load" />
+  </node>
+  
+  <!-- Maplin Arm Server -->
+  <node name="maplin_arm_server" pkg="maplin_arm" type="ROS_ArmServer.py" respawn="false">
+  </node>
+
+  <!-- Webcam -->
+  <node name="camera" output="screen" pkg="gscam" type="gscam" respawn="false">
+    <env name="GSCAM_CONFIG" value="v4l2src device=/dev/video0 ! videoscale ! video/x-raw-rgb, width=320, height=240 ! ffmpegcolorspace ! identity name=ros ! fakesink"/>
+    <remap from="/gscam/image_raw" to="/camera/image"/>
+    <remap from="/gscam/camera_info" to="/camera/camera_info"/>
+  </node>
+
+</launch>

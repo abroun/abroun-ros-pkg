@@ -20,6 +20,7 @@ class FilePath( gtk.VBox ):
 
         self.filter = None
         self.startingFolder = None
+        self.onFilenameChangedCallback = None
 
         gtk.widget_push_composite_child()
         
@@ -39,7 +40,7 @@ class FilePath( gtk.VBox ):
         
     #---------------------------------------------------------------------------
     def setFilter( self, filter ):
-        
+    
         self.filter = filter
     
     #---------------------------------------------------------------------------
@@ -50,7 +51,20 @@ class FilePath( gtk.VBox ):
     #---------------------------------------------------------------------------
     def getFilename( self ):
         return self.tbxFile.get_text()
-       
+        
+    #---------------------------------------------------------------------------
+    def setFilename( self, filename ):
+        return self.tbxFile.set_text( filename )
+        
+    #---------------------------------------------------------------------------
+    def setOnFilenameChangedCallback( self, callback ):
+        self.onFilenameChangedCallback = callback
+    
+    #---------------------------------------------------------------------------
+    def onTbxFileChanged( self, widget, data = None ):
+        if self.onFilenameChangedCallback != None:
+            self.onFilenameChangedCallback( widget, data )
+        
     #---------------------------------------------------------------------------
     def onBtnFileClicked( self, widget, data = None ):
     

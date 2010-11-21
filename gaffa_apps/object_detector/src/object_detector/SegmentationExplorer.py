@@ -339,10 +339,13 @@ class MainWindow:
             workingMask = np.copy( self.maskArray )
             
             fgModel = cv.CreateMat( 1, 5*13, cv.CV_32FC1 )
+            cv.Set( fgModel, 0 )
             bgModel = cv.CreateMat( 1, 5*13, cv.CV_32FC1 )
+            cv.Set( bgModel, 0 )
             
-            cv.GrabCut( self.image, workingMask, 
-                (0,0,0,0), fgModel, bgModel, 4, self.GC_INIT_WITH_MASK )
+            workingImage = np.copy( self.image )
+            cv.GrabCut( workingImage, workingMask, 
+                (0,0,0,0), fgModel, bgModel, 1, self.GC_INIT_WITH_MASK )
             
             self.segmentation = np.copy( self.image )
             self.segmentation[ (workingMask != self.GC_PR_FGD) & (workingMask != self.GC_FGD) ] = 0

@@ -13,6 +13,7 @@
   <depend package="lynxmotion_arm" />
   <depend package="maplin_arm" />
   <depend package="sensor_msgs" />
+  <depend package="opencv2" />
 
 </package>
 

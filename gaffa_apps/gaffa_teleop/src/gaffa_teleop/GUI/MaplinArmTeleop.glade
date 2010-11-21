@@ -86,84 +86,171 @@
               </packing>
             </child>
             <child>
-              <object class="GtkTable" id="table1">
+              <object class="GtkVBox" id="vbox2">
                 <property name="visible">True</property>
-                <property name="n_rows">3</property>
-                <property name="n_columns">3</property>
                 <child>
-                  <object class="GtkButton" id="btnLeft">
+                  <object class="GtkTable" id="table1">
                     <property name="visible">True</property>
-                    <property name="can_focus">True</property>
-                    <property name="receives_default">True</property>
-                    <property name="image">imgLeft</property>
-                    <signal name="pressed" handler="onBtnLeftPressed"/>
-                    <signal name="released" handler="onBtnLeftReleased"/>
+                    <property name="n_rows">3</property>
+                    <property name="n_columns">3</property>
+                    <child>
+                      <object class="GtkButton" id="btnLeft">
+                        <property name="visible">True</property>
+                        <property name="can_focus">True</property>
+                        <property name="receives_default">True</property>
+                        <property name="image">imgLeft</property>
+                        <signal name="pressed" handler="onBtnLeftPressed"/>
+                        <signal name="released" handler="onBtnLeftReleased"/>
+                      </object>
+                      <packing>
+                        <property name="top_attach">1</property>
+                        <property name="bottom_attach">2</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkButton" id="btnRight">
+                        <property name="visible">True</property>
+                        <property name="can_focus">True</property>
+                        <property name="receives_default">True</property>
+                        <property name="image">imgRight</property>
+                        <signal name="pressed" handler="onBtnRightPressed"/>
+                        <signal name="released" handler="onBtnRightReleased"/>
+                      </object>
+                      <packing>
+                        <property name="left_attach">2</property>
+                        <property name="right_attach">3</property>
+                        <property name="top_attach">1</property>
+                        <property name="bottom_attach">2</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkButton" id="btnDown">
+                        <property name="visible">True</property>
+                        <property name="can_focus">True</property>
+                        <property name="receives_default">True</property>
+                        <property name="image">imgDown</property>
+                        <signal name="pressed" handler="onBtnDownPressed"/>
+                        <signal name="released" handler="onBtnDownReleased"/>
+                      </object>
+                      <packing>
+                        <property name="left_attach">1</property>
+                        <property name="right_attach">2</property>
+                        <property name="top_attach">2</property>
+                        <property name="bottom_attach">3</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <object class="GtkButton" id="btnUp">
+                        <property name="visible">True</property>
+                        <property name="can_focus">True</property>
+                        <property name="receives_default">True</property>
+                        <property name="image">imgUp</property>
+                        <signal name="pressed" handler="onBtnUpPressed"/>
+                        <signal name="released" handler="onBtnUpReleased"/>
+                      </object>
+                      <packing>
+                        <property name="left_attach">1</property>
+                        <property name="right_attach">2</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
                   </object>
                   <packing>
-                    <property name="top_attach">1</property>
-                    <property name="bottom_attach">2</property>
+                    <property name="position">0</property>
                   </packing>
                 </child>
                 <child>
-                  <object class="GtkButton" id="btnRight">
+                  <object class="GtkHBox" id="hbox2">
                     <property name="visible">True</property>
-                    <property name="can_focus">True</property>
-                    <property name="receives_default">True</property>
-                    <property name="image">imgRight</property>
-                    <signal name="pressed" handler="onBtnRightPressed"/>
-                    <signal name="released" handler="onBtnRightReleased"/>
+                    <child>
+                      <object class="GtkVBox" id="vbox3">
+                        <property name="visible">True</property>
+                        <child>
+                          <object class="GtkButton" id="btnShoulderUp">
+                            <property name="visible">True</property>
+                            <property name="can_focus">True</property>
+                            <property name="receives_default">True</property>
+                            <property name="image">imgShoulderUp</property>
+                            <signal name="pressed" handler="onBtnShoulderUpPressed"/>
+                            <signal name="released" handler="onBtnShoulderUpReleased"/>
+                          </object>
+                          <packing>
+                            <property name="position">0</property>
+                          </packing>
+                        </child>
+                        <child>
+                          <object class="GtkButton" id="btnShoulderDown">
+                            <property name="visible">True</property>
+                            <property name="can_focus">True</property>
+                            <property name="receives_default">True</property>
+                            <property name="image">imgShoulderDown</property>
+                            <signal name="pressed" handler="onBtnShoulderDownPressed"/>
+                            <signal name="released" handler="onBtnShoulderDownReleased"/>
+                          </object>
+                          <packing>
+                            <property name="position">1</property>
+                          </packing>
+                        </child>
+                      </object>
+                      <packing>
+                        <property name="position">0</property>
+                      </packing>
+                    </child>
+                    <child>
+                      <placeholder/>
+                    </child>
+                    <child>
+                      <object class="GtkVBox" id="vbox4">
+                        <property name="visible">True</property>
+                        <child>
+                          <object class="GtkButton" id="btnElbowUp">
+                            <property name="visible">True</property>
+                            <property name="can_focus">True</property>
+                            <property name="receives_default">True</property>
+                            <property name="image">imgElbowUp</property>
+                            <signal name="pressed" handler="onBtnElbowUpPressed"/>
+                            <signal name="released" handler="onBtnElbowUpReleased"/>
+                          </object>
+                          <packing>
+                            <property name="position">0</property>
+                          </packing>
+                        </child>
+                        <child>
+                          <object class="GtkButton" id="btnElbowDown">
+                            <property name="visible">True</property>
+                            <property name="can_focus">True</property>
+                            <property name="receives_default">True</property>
+                            <property name="image">imgElbowDown</property>
+                            <signal name="pressed" handler="onBtnElbowDownPressed"/>
+                            <signal name="released" handler="onBtnElbowDownReleased"/>
+                          </object>
+                          <packing>
+                            <property name="position">1</property>
+                          </packing>
+                        </child>
+                      </object>
+                      <packing>
+                        <property name="position">2</property>
+                      </packing>
+                    </child>
                   </object>
                   <packing>
-                    <property name="left_attach">2</property>
-                    <property name="right_attach">3</property>
-                    <property name="top_attach">1</property>
-                    <property name="bottom_attach">2</property>
+                    <property name="position">1</property>
                   </packing>
-                </child>
-                <child>
-                  <object class="GtkButton" id="btnDown">
-                    <property name="visible">True</property>
-                    <property name="can_focus">True</property>
-                    <property name="receives_default">True</property>
-                    <property name="image">imgDown</property>
-                    <signal name="pressed" handler="onBtnDownPressed"/>
-                    <signal name="released" handler="onBtnDownReleased"/>
-                  </object>
-                  <packing>
-                    <property name="left_attach">1</property>
-                    <property name="right_attach">2</property>
-                    <property name="top_attach">2</property>
-                    <property name="bottom_attach">3</property>
-                  </packing>
-                </child>
-                <child>
-                  <object class="GtkButton" id="btnUp">
-                    <property name="visible">True</property>
-                    <property name="can_focus">True</property>
-                    <property name="receives_default">True</property>
-                    <property name="image">imgUp</property>
-                    <signal name="pressed" handler="onBtnUpPressed"/>
-                    <signal name="released" handler="onBtnUpReleased"/>
-                  </object>
-                  <packing>
-                    <property name="left_attach">1</property>
-                    <property name="right_attach">2</property>
-                  </packing>
-                </child>
-                <child>
-                  <placeholder/>
-                </child>
-                <child>
-                  <placeholder/>
-                </child>
-                <child>
-                  <placeholder/>
-                </child>
-                <child>
-                  <placeholder/>
-                </child>
-                <child>
-                  <placeholder/>
                 </child>
               </object>
               <packing>
@@ -175,8 +262,24 @@
             <property name="position">1</property>
           </packing>
         </child>
+        <child>
+          <object class="GtkButton" id="btnSaveImage">
+            <property name="label" translatable="yes">Save Image</property>
+            <property name="visible">True</property>
+            <property name="can_focus">True</property>
+            <property name="receives_default">True</property>
+            <signal name="clicked" handler="onBtnSaveImageClicked"/>
+          </object>
+          <packing>
+            <property name="position">2</property>
+          </packing>
+        </child>
       </object>
     </child>
+  </object>
+  <object class="GtkImage" id="image1">
+    <property name="visible">True</property>
+    <property name="stock">gtk-open</property>
   </object>
   <object class="GtkImage" id="imgLeft">
     <property name="visible">True</property>
@@ -194,8 +297,20 @@
     <property name="visible">True</property>
     <property name="stock">gtk-go-up</property>
   </object>
-  <object class="GtkImage" id="image1">
+  <object class="GtkImage" id="imgShoulderUp">
     <property name="visible">True</property>
-    <property name="stock">gtk-open</property>
+    <property name="stock">gtk-go-up</property>
+  </object>
+  <object class="GtkImage" id="imgShoulderDown">
+    <property name="visible">True</property>
+    <property name="stock">gtk-go-down</property>
+  </object>
+  <object class="GtkImage" id="imgElbowUp">
+    <property name="visible">True</property>
+    <property name="stock">gtk-go-up</property>
+  </object>
+  <object class="GtkImage" id="imgElbowDown">
+    <property name="visible">True</property>
+    <property name="stock">gtk-go-down</property>
   </object>
 </interface>
