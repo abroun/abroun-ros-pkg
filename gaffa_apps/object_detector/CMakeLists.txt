@@ -36,6 +36,12 @@ rosbuild_add_library( PyBlobLib src/PyBlobLib.cpp )
 set_property( TARGET PyBlobLib PROPERTY PREFIX "" )
 target_link_libraries( PyBlobLib BlobLib )
 
+rosbuild_add_library( VarFlowLib src/VarFlowLib/VarFlow.cpp )
+
+rosbuild_add_library( PyVarFlowLib src/PyVarFlowLib.cpp )
+set_property( TARGET PyVarFlowLib PROPERTY PREFIX "" )
+target_link_libraries( PyVarFlowLib VarFlowLib )
+
 #target_link_libraries(${PROJECT_NAME} another_library)
 #rosbuild_add_boost_directories()
 #rosbuild_link_boost(${PROJECT_NAME} thread)

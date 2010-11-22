@@ -62,8 +62,8 @@ class MotionDetectionFilter:
             # Have a minimum value for the standard deviation so that we don't have
             # highly sensitive pixels
             print "MaxStdDev", np.max( stdDev )
-            stdDev[ stdDev < self.MINIMUM_MODEL_STD_DEV ] = 3.0 #self.MINIMUM_MODEL_STD_DEV
-            stdDev[ stdDev > self.MINIMUM_MODEL_STD_DEV ] = 3.0
+            stdDev[ stdDev < self.MINIMUM_MODEL_STD_DEV ] = 2.0 #self.MINIMUM_MODEL_STD_DEV
+            stdDev[ stdDev > self.MINIMUM_MODEL_STD_DEV ] = 2.0
             
             self.pixelLowerThreshold = 10.0*stdDev
             self.pixelUpperThreshold = 25.0*stdDev

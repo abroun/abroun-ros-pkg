@@ -37,6 +37,7 @@ from ImageFlowFilter import ImageFlowFilter
 from ResidualSaliencyFilter import ResidualSaliencyFilter
 
 import PyBlobLib
+import PyVarFlowLib
 
 #-------------------------------------------------------------------------------
 class OutputMode:
@@ -54,7 +55,7 @@ class MainWindow:
     OPTICAL_FLOW_RANGE_WIDTH = 8    # Range to look outside of a block for motion
     OPTICAL_FLOW_RANGE_HEIGHT = 8
     
-    PROCESSED_FRAME_DIFF = 1
+    PROCESSED_FRAME_DIFF = 3
     
     # Classes of pixel in GrabCut algorithm
     GC_BGD = 0      # background
@@ -365,7 +366,8 @@ class MainWindow:
     #---------------------------------------------------------------------------
     def processBag( self, bag ):
     
-        FLIP_IMAGE = True
+        FLIP_IMAGE = False
+        USING_OPTICAL_FLOW_FOR_MOTION = False
     
         bagFrameIdx = 0
         frameIdx = 0
@@ -412,7 +414,17 @@ class MainWindow:
                     opticalFlowFilter.calcOpticalFlow( grayImage )
                     
                 # Detect motion
-                motionImage = motionDetectionFilter.calcMotion( grayImage )
+                if USING_OPTICAL_FLOW_FOR_MOTION:
+                    if frameIdx == 0:
+                        motionImage = PyVarFlowLib.createMotionMask( 
+                            grayImageNumpPy, grayImageNumpPy )
+                    else:
+                        motionImage = PyVarFlowLib.createMotionMask( 
+                            np.array( self.grayScaleImageList[ frameIdx - 1 ] ), 
+                            grayImageNumpPy )
+                else:
+                    motionImage = motionDetectionFilter.calcMotion( grayImage )
+                
                 
                 # Work out the left most point in the image where motion appears
                 motionTest = np.copy( motionImage )
@@ -603,8 +615,8 @@ class MainWindow:
                     print "Msk size", workingMask[ possibleForeground ].size
                     print workingMask[ 0, 0:10 ]
                     
-                    fgModel = cv.CreateMat( 1, 5*13, cv.CV_32FC1 )
-                    bgModel = cv.CreateMat( 1, 5*13, cv.CV_32FC1 )
+                    fgModel = cv.CreateMat( 1, 5*13, cv.CV_64FC1 )
+                    bgModel = cv.CreateMat( 1, 5*13, cv.CV_64FC1 )
                     #workingMask[ possibleForeground ] = self.GC_FGD
                     #workingMask[ possibleForeground == False ] = self.GC_PR_BGD
                     
@@ -727,6 +739,26 @@ class MainWindow:
                     
                     outputName = BASE_MOTION_IMAGE_NAME.format( frameIdx + 1 )
                     cv.SaveImage( outputName, colourImage )
+            
+            # Recalculate impactFrameIdx
+            width = self.motionImageList[ 0 ].shape[ 1 ]
+            
+            totalMotionDiff = 0
+            maxMotionDiff = 0
+            impactFrameIdx = None
+            for motionIdx in range( 1, len( self.leftMostMotionList ) ):
+            
+                motionDiff = abs( self.leftMostMotionList[ motionIdx ] \
+                    - self.leftMostMotionList[ motionIdx - 1 ] )
+                totalMotionDiff += motionDiff
+                    
+                if motionDiff > maxMotionDiff and totalMotionDiff > 0.5*width:
+                    maxMotionDiff = motionDiff
+                    impactFrameIdx = motionIdx
+            
+            if maxMotionDiff <= 18:
+                impactFrameIdx = None
+                    
             
             if impactFrameIdx != None:
                 

@@ -30,6 +30,7 @@ import gobject
 from abroun_gtk_gui.widgets import FilePath
 from abroun_gtk_gui.Display import Display
 from ImageFlowFilter import ImageFlowFilter
+import PyBlobLib
 
 #-------------------------------------------------------------------------------
 class ImpactImageData:
@@ -54,16 +55,29 @@ class ImpactConfig( yaml.YAMLObject ):
 
 #-------------------------------------------------------------------------------
 class MainWindow:
- 
+
+    FOREGROUND_BRUSH_COLOUR = np.array( [ 255, 255, 0 ], dtype=np.uint8 )
+    PROBABLY_FOREGROUND_BRUSH_COLOUR = np.array( [ 0, 255, 0 ], dtype=np.uint8 )
+    BACKGROUND_BRUSH_COLOUR = np.array( [ 0, 0, 255 ], dtype=np.uint8 )
+    
+    # Classes of pixel in GrabCut algorithm
+    GC_BGD = 0      # background
+    GC_FGD = 1      # foreground
+    GC_PR_BGD = 2   # most probably background
+    GC_PR_FGD = 3   # most probably foreground 
+
+    # GrabCut algorithm flags
+    GC_INIT_WITH_RECT = 0
+    GC_INIT_WITH_MASK = 1
+    GC_EVAL = 2
+
     #---------------------------------------------------------------------------
     def __init__( self ):
     
         self.scriptPath = os.path.dirname( __file__ )
         
-        self.mergedImage = None
         self.accumulatorImage = None
-        self.maskImage = None
-        self.segmentedImage = None
+        self.maskArray = None
         self.fillingImageDataUI = False
         self.handlingFilePath = False
 
@@ -373,7 +387,41 @@ class MainWindow:
     
     #---------------------------------------------------------------------------
     def onBtnUpdateSegmentationClicked( self, widget ):
-        pass
+        
+        if self.maskArray != None \
+            and "ImpactImage" in self.images.keys() \
+            and self.images[ "ImpactImage" ] != None:
+            
+            workingMask = np.copy( self.maskArray )
+            
+            fgModel = cv.CreateMat( 1, 5*13, cv.CV_64FC1 )
+            cv.Set( fgModel, 0 )
+            bgModel = cv.CreateMat( 1, 5*13, cv.CV_64FC1 )
+            cv.Set( bgModel, 0 )
+            
+            workingImage = np.copy( self.images[ "ImpactImage" ] )
+            cv.GrabCut( workingImage, workingMask, 
+                (0,0,0,0), fgModel, bgModel, 6, self.GC_INIT_WITH_MASK )
+                
+            cv.Set( fgModel, 0 )
+            cv.Set( bgModel, 0 )
+            bgdPixels = (workingMask != self.GC_PR_FGD) & (workingMask != self.GC_FGD)
+            workingMask[ bgdPixels ] = 0
+            workingMask[ bgdPixels == False ] = 255
+            cv.Erode( workingMask, workingMask )
+            bgdPixels = workingMask == 0
+            workingMask[ bgdPixels ] = self.GC_PR_BGD
+            workingMask[ bgdPixels == False ] = self.GC_PR_FGD
+            workingMask[ self.exclusionMask == 0 ] = self.GC_BGD
+            
+            cv.GrabCut( workingImage, workingMask, 
+                (0,0,0,0), fgModel, bgModel, 6, self.GC_INIT_WITH_MASK )
+            
+            segmentation = np.copy( self.images[ "ImpactImage" ] )
+            segmentation[ (workingMask != self.GC_PR_FGD) & (workingMask != self.GC_FGD) ] = 0
+            self.dwgSegmentedImageDisplay.setImageFromNumpyArray( segmentation )
+        else:
+            self.dwgSegmentedImageDisplay.clear()
     
     #---------------------------------------------------------------------------
     def onDwgCurImageExposeEvent( self, widget, data ):
@@ -554,6 +602,116 @@ class MainWindow:
         else:
             self.accumulatorImage = None
             self.dwgAccumulatorImageDisplay.clear()
+            
+        self.updateMaskImage()
+            
+    #---------------------------------------------------------------------------
+    def updateMaskImage( self ):
+        
+        USING_OPTICAL_FLOW = False
+        ROI_X = 0
+        ROI_Y = 76
+        ROI_WIDTH = 230
+        ROI_HEIGHT = 100
+        
+        if self.accumulatorImage != None:
+            
+            # Create the segmentation mask from the accumulator image
+            startMask = np.copy( self.accumulatorImage )
+            cv.Dilate( startMask, startMask )
+            cv.Erode( startMask, startMask )
+            cv.Dilate( startMask, startMask )
+            cv.Erode( startMask, startMask )
+            startMask = scipy.ndimage.filters.gaussian_filter( 
+                startMask, 5.0, mode='constant' )
+            
+            startMask[ startMask > 0 ] = 255
+            #cv.Erode( startMask, startMask )
+            #cv.Dilate( startMask, startMask )
+            
+            #if USING_OPTICAL_FLOW:
+            #    cv.Erode( startMask, startMask )
+            #    cv.Erode( startMask, startMask )
+                
+            # Find the larget blob in the ROI
+            # Label blobs
+            startMask, numBlobs = PyBlobLib.labelBlobs( startMask )
+            
+            # Find blobs in the region of interest
+            testMap = np.copy( startMask )
+            testMap[ :ROI_Y, : ] = 0       # Mask out area above the ROI
+            testMap[ :, :ROI_X ] = 0       # Mask out area to the left of the ROI
+            testMap[ ROI_Y+ROI_HEIGHT: ] = 0   # Mask out area below the ROI
+            testMap[ :, ROI_X+ROI_WIDTH: ] = 0   # Mask out area to the right of the ROI
+        
+            biggestBlobIdx = None
+            biggestBlobSize = 0
+        
+            for blobIdx in range( 1, numBlobs + 1 ):
+                if testMap[ testMap == blobIdx ].size > 0:
+                    blobSize = startMask[ startMask == blobIdx ].size
+                    if blobSize > biggestBlobSize:
+                        biggestBlobSize = blobSize
+                        biggestBlobIdx = blobIdx
+        
+            # Isolate the largest blob
+            if biggestBlobIdx != None:
+                biggestBlobPixels = (startMask == biggestBlobIdx)
+                startMask[ biggestBlobPixels ] = 255
+                startMask[ biggestBlobPixels == False ] = 0
+            else:
+                print "No central blob"
+                self.maskArray = None
+                self.dwgMaskImageDisplay.clear()
+                
+            # Now expand it to get exclusion mask
+            self.exclusionMask = np.copy( startMask )
+            for i in range( 10 ):
+                cv.Dilate( self.exclusionMask, self.exclusionMask )
+            cv.Erode( self.exclusionMask, self.exclusionMask )
+            cv.Erode( self.exclusionMask, self.exclusionMask )
+            
+            #----------------------------------------------------
+            
+            self.maskArray = np.copy( startMask )
+            possiblyForeground = ( self.maskArray > 0 ) & ( self.accumulatorImage > 0 )
+            self.maskArray[ possiblyForeground ] = self.GC_PR_FGD
+            self.maskArray[ possiblyForeground == False ] = self.GC_PR_BGD
+            self.maskArray[ self.exclusionMask == 0 ] = self.GC_BGD
+            
+            self.definiteMask = np.copy( self.accumulatorImage )
+            self.definiteMask[ possiblyForeground ] = 255
+            self.definiteMask[ possiblyForeground == False ] = 0
+            cv.Erode( self.definiteMask, self.definiteMask )
+            cv.Erode( self.definiteMask, self.definiteMask )
+            self.maskArray[ self.definiteMask == 255 ] = self.GC_FGD
+            
+            #if not USING_OPTICAL_FLOW:
+            #    smallMask = np.copy( startMask )
+            #    smallMask[ smallMask > 0 ] = 255
+            #    cv.Erode( smallMask, smallMask )
+            #    self.maskArray[ smallMask > 0 ] = self.GC_FGD
+            
+            # Draw the segmentation mask
+            composedImage = None
+            if "ImpactImage" in self.images.keys() \
+                and self.images[ "ImpactImage" ] != None:
+                composedImage = np.copy( self.images[ "ImpactImage" ] )
+                
+            if composedImage == None:
+                height = self.accumulatorImage.shape[ 1 ]
+                width = self.accumulatorImage.shape[ 0 ]
+                composedImage = np.zeros( ( height, width, 3 ), dtype=np.uint8 )
+            
+            composedImage[ self.maskArray == self.GC_FGD ] = self.FOREGROUND_BRUSH_COLOUR
+            composedImage[ self.maskArray == self.GC_PR_FGD ] = self.PROBABLY_FOREGROUND_BRUSH_COLOUR
+            composedImage[ self.maskArray == self.GC_BGD ] = self.BACKGROUND_BRUSH_COLOUR
+            
+            self.dwgMaskImageDisplay.setImageFromNumpyArray( composedImage )
+        else:
+            
+            self.maskArray = None
+            self.dwgMaskImageDisplay.clear()
             
 #-------------------------------------------------------------------------------
 if __name__ == "__main__":
