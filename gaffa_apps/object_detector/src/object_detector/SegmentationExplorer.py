@@ -19,110 +19,8 @@ pygtk.require('2.0')
 import gtk
 import gobject
 from ResidualSaliencyFilter import ResidualSaliencyFilter
+from abroun_gtk_gui.Display import Display
 import PyBlobLib
-
-#-------------------------------------------------------------------------------
-class Display:
-    '''A combination of a pixBuf and the drawing area that is used to
-       to display it'''
-    
-    #---------------------------------------------------------------------------
-    def __init__( self, drawingArea ):
-        
-        self.drawingArea = drawingArea
-        self.pixBuf = None
-        
-    #---------------------------------------------------------------------------
-    def setImageFromOpenCVMatrix( self, cvMtx ):
-        
-        width = cvMtx.width
-        height = cvMtx.height
-        data = cvMtx.tostring()
-        
-        self.setImage( width, height, data )
-        
-    #---------------------------------------------------------------------------
-    def setImageFromNumpyArray( self, imageArray ):
-        
-        width = imageArray.shape[ 1 ]
-        height = imageArray.shape[ 0 ]
-        data = imageArray.tostring()
-        
-        self.setImage( width, height, data )
-        
-    #---------------------------------------------------------------------------
-    def setImage( self, width, height, data ):
-        
-        # Display the image
-        self.pixBuf = gtk.gdk.pixbuf_new_from_data( 
-            data, 
-            gtk.gdk.COLORSPACE_RGB,
-            False,
-            8,
-            width,
-            height,
-            width*3 )
-            
-        # Resize the drawing area if necessary
-        if self.drawingArea.get_size_request() != ( width, height ):
-            self.drawingArea.set_size_request( width, height )
-
-        self.drawingArea.queue_draw()
-        
-    #---------------------------------------------------------------------------
-    def queueDraw( self ):
-        self.drawingArea.queue_draw()
-        
-    #---------------------------------------------------------------------------
-    def drawPixBufToDrawingArea( self, redrawArea ):
-        '''Draws the PixBuf to the drawing area. If successful then it returns
-           the image rectange that was drawn to so that futher drawing can be
-           done. Otherwise it returns None'''
-        
-        imgRect = self.getImageRectangleInWidget( self.drawingArea )
-        if imgRect != None:
-            imgOffsetX = imgRect.x
-            imgOffsetY = imgRect.y
-                
-            # Get the total area that needs to be redrawn
-            redrawRect = imgRect.intersect( redrawArea )
-        
-            srcX = redrawRect.x - imgOffsetX
-            srcY = redrawRect.y - imgOffsetY
-           
-            self.drawingArea.window.draw_pixbuf( 
-                self.drawingArea.get_style().fg_gc[ gtk.STATE_NORMAL ],
-                self.pixBuf, srcX, srcY, 
-                redrawRect.x, redrawRect.y, redrawRect.width, redrawRect.height )
-        
-        return imgRect
-         
-    #---------------------------------------------------------------------------
-    def getImageRectangleInWidget( self, widget ):
-        '''Returns a rectangle for drawing the contents of the PixBuf centred
-           in the middle of the given widget. If no PixBuf has been set yet then
-           this routine returns None'''
-        
-        if self.pixBuf == None:
-            return None
-        else:
-            imageWidth = self.pixBuf.get_width()
-            imageHeight = self.pixBuf.get_height()
-        
-            # Centre the image inside the widget
-            widgetX, widgetY, widgetWidth, widgetHeight = widget.get_allocation()
-        
-            imgRect = gtk.gdk.Rectangle( 0, 0, widgetWidth, widgetHeight )
-        
-            if widgetWidth > imageWidth:
-                imgRect.x = (widgetWidth - imageWidth) / 2
-                imgRect.width = imageWidth
-            
-            if widgetHeight > imageHeight:
-                imgRect.y = (widgetHeight - imageHeight) / 2
-                imgRect.height = imageHeight
-        
-            return imgRect
 
 #-------------------------------------------------------------------------------
 class MainWindow:
@@ -158,12 +56,14 @@ class MainWindow:
         self.window = builder.get_object( "winMain" )   
         dwgImage = builder.get_object( "dwgImage" )
         dwgSegmentation = builder.get_object( "dwgSegmentation" )
+        dwgSaliency = builder.get_object( "dwgSaliency" )
         self.adjBrushSize = builder.get_object( "adjBrushSize" )
         self.comboBrushType = builder.get_object( "comboBrushType" )
         self.comboPixelClass = builder.get_object( "comboPixelClass" )
         
         self.dwgImageDisplay = Display( dwgImage )
         self.dwgSegmentationDisplay = Display( dwgSegmentation )
+        self.dwgSaliencyDisplay = Display( dwgSaliency )
         
         # Set default values
         self.adjBrushSize.set_value( 1 )
@@ -368,6 +268,7 @@ class MainWindow:
             cv.CvtColor( self.image, grayImage, cv.CV_RGB2GRAY )
             
             saliencyMap, largeSaliencyMap = self.residualSaliencyFilter.calcSaliencyMap( grayImage )
+            self.dwgSaliencyDisplay.setImageFromNumpyArray( largeSaliencyMap )
         
             # Threshold to get blobs
             blobPixels = largeSaliencyMap >= 160
@@ -480,7 +381,12 @@ class MainWindow:
     #---------------------------------------------------------------------------
     def onDwgSegmentationExposeEvent( self, widget, data = None ):
         
-        self.dwgSegmentationDisplay.drawPixBufToDrawingArea( data.area )    
+        self.dwgSegmentationDisplay.drawPixBufToDrawingArea( data.area )   
+        
+    #---------------------------------------------------------------------------
+    def onDwgSaliencyExposeEvent( self, widget, data = None ):
+        
+        self.dwgSaliencyDisplay.drawPixBufToDrawingArea( data.area )   
 
     #---------------------------------------------------------------------------
     def update( self ):

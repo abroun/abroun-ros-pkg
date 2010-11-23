@@ -55,7 +55,7 @@ class MainWindow:
     OPTICAL_FLOW_RANGE_WIDTH = 8    # Range to look outside of a block for motion
     OPTICAL_FLOW_RANGE_HEIGHT = 8
     
-    PROCESSED_FRAME_DIFF = 3
+    PROCESSED_FRAME_DIFF = 2
     
     # Classes of pixel in GrabCut algorithm
     GC_BGD = 0      # background
