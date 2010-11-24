@@ -14,9 +14,20 @@ import cv
 #-------------------------------------------------------------------------------
 parser = OptionParser()
 parser.add_option( "-p", "--prefix", dest="prefix", default="image_",
-                  help="Prefix of putput images", metavar="FILE")
+                  help="Prefix of putput images", metavar="FILE" )
+parser.add_option( "-i", "--increment", dest="frameIncrement", default="1",
+                  help="Number of frames to advance with each step" )
+parser.add_option( "-f", "--format", dest="imageFormat", default="png",
+                  help="Image format" )
 
 (options, args) = parser.parse_args()
+
+options.frameIncrement = int( options.frameIncrement )
+if options.frameIncrement < 1:
+    options.frameIncrement = 1
+
+frameIdx = -1
+nextFrameIdx = 0
 
 if len( args ) <= 0:
     print "Error: No bag file supplied"
@@ -28,6 +39,12 @@ else:
         
         if msg._type == "sensor_msgs/Image":
         
+            frameIdx += 1
+            if frameIdx == nextFrameIdx:
+                nextFrameIdx += options.frameIncrement
+            else:
+                continue
+
             if msg.encoding == "rgb8" or msg.encoding == "bgr8":
             
                 if imageIdx > 0:
@@ -41,7 +58,7 @@ else:
                 cv.SetData( curImage, msg.data, msg.step )
                 cv.CvtColor( curImage, curImage, cv.CV_RGB2BGR )
                 
-                imageFilename = "{0}{1:08d}.jpeg".format( options.prefix, imageIdx )
+                imageFilename = "{0}{1:08d}.{2}".format( options.prefix, imageIdx, options.imageFormat )
                 cv.SaveImage( imageFilename, curImage )
                 imageIdx += 1
                 
