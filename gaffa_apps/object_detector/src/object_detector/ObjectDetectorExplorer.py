@@ -11,8 +11,10 @@ import math
 import os.path
 import time
 import threading
+from optparse import OptionParser
 
 import numpy as np
+import scipy.ndimage
 import cv
 
 import yaml
@@ -55,7 +57,7 @@ class MainWindow:
     OPTICAL_FLOW_RANGE_WIDTH = 8    # Range to look outside of a block for motion
     OPTICAL_FLOW_RANGE_HEIGHT = 8
     
-    PROCESSED_FRAME_DIFF = 2
+    PROCESSED_FRAME_DIFF = 1
     
     # Classes of pixel in GrabCut algorithm
     GC_BGD = 0      # background
@@ -69,8 +71,9 @@ class MainWindow:
     GC_EVAL = 2
  
     #---------------------------------------------------------------------------
-    def __init__( self, bagFilename = None ):
+    def __init__( self, options, bagFilename = None ):
     
+        self.options = options
         self.scriptPath = os.path.dirname( __file__ )
         self.image = None
         self.frameIdx = 0
@@ -78,6 +81,8 @@ class MainWindow:
         self.numFramesProcessed = 0
         self.graphCanvas = None
         self.graphNavToolbar = None
+        
+        self.PROCESSED_FRAME_DIFF = int( self.options.frameSkip )
             
         # Setup the GUI        
         builder = gtk.Builder()
@@ -364,10 +369,189 @@ class MainWindow:
         self.sequenceControls.setNumFrames( numFrames )
 
     #---------------------------------------------------------------------------
+    def produceSegmentation( self, startFrame, impactMotionImage, 
+                                preMotionImages, postMotionImages ):
+        
+        ROI_X = 0
+        ROI_Y = 76
+        ROI_WIDTH = 230
+        ROI_HEIGHT = 100
+        
+        blankFrame = np.zeros( ( startFrame.height, startFrame.width ), dtype=np.uint8 )
+        
+        imageFlowFilter = ImageFlowFilter()    
+        
+        # Create the accumulator image
+        accumulatorArray = np.copy( impactMotionImage ).astype( np.int32 )
+            
+        # Take maximum values from motion images after the impact but
+        # don't add them in to de-emphasise the manipulator
+        imageNum = 1
+        for postMotionImage in postMotionImages:
+            
+            print "Aligning post impact image {0}...".format( imageNum )
+            imageNum += 1
+            
+            ( transX, transY, rotationAngle, alignedImage ) = \
+                imageFlowFilter.calcImageFlow( impactMotionImage, postMotionImage )
+            accumulatorArray = np.maximum( accumulatorArray, alignedImage )
+                    
+        # Dilate and subtract motion images from before the impact
+        imageNum = 1
+        for preMotionImage in preMotionImages:
+            
+            print "Aligning pre impact image {0}...".format( imageNum )
+            imageNum += 1
+            
+            ( transX, transY, rotationAngle, alignedImage ) = \
+                imageFlowFilter.calcImageFlow( impactMotionImage, preMotionImage )
+                
+            cv.Dilate( alignedImage, alignedImage )
+            cv.Dilate( alignedImage, alignedImage )
+            cv.Dilate( alignedImage, alignedImage )
+            accumulatorArray = accumulatorArray - alignedImage
+            
+        accumulatorImage = np.clip( accumulatorArray, 0, 255 ).astype( np.uint8 )
+        
+        # Create the segmentation mask from the accumulator image
+        startMask = np.copy( accumulatorImage )
+        cv.Dilate( startMask, startMask )
+        cv.Erode( startMask, startMask )
+        cv.Dilate( startMask, startMask )
+        cv.Erode( startMask, startMask )
+        startMask = scipy.ndimage.filters.gaussian_filter( 
+            startMask, 5.0, mode='constant' )
+        
+        startMask[ startMask > 0 ] = 255
+            
+        # Find the larget blob in the ROI
+        # Label blobs
+        startMask, numBlobs = PyBlobLib.labelBlobs( startMask )
+        
+        # Find blobs in the region of interest
+        testMap = np.copy( startMask )
+        testMap[ :ROI_Y, : ] = 0       # Mask out area above the ROI
+        testMap[ :, :ROI_X ] = 0       # Mask out area to the left of the ROI
+        testMap[ ROI_Y+ROI_HEIGHT: ] = 0   # Mask out area below the ROI
+        testMap[ :, ROI_X+ROI_WIDTH: ] = 0   # Mask out area to the right of the ROI
+    
+        biggestBlobIdx = None
+        biggestBlobSize = 0
+    
+        for blobIdx in range( 1, numBlobs + 1 ):
+            if testMap[ testMap == blobIdx ].size > 0:
+                blobSize = startMask[ startMask == blobIdx ].size
+                if blobSize > biggestBlobSize:
+                    biggestBlobSize = blobSize
+                    biggestBlobIdx = blobIdx
+    
+        # Isolate the largest blob
+        if biggestBlobIdx != None:
+            biggestBlobPixels = (startMask == biggestBlobIdx)
+            startMask[ biggestBlobPixels ] = 255
+            startMask[ biggestBlobPixels == False ] = 0
+        else:
+            print "No central blob"
+            return blankFrame
+            
+        # Now expand it to get exclusion mask
+        exclusionMask = np.copy( startMask )
+        for i in range( 10 ):
+            cv.Dilate( exclusionMask, exclusionMask )
+        cv.Erode( exclusionMask, exclusionMask )
+        cv.Erode( exclusionMask, exclusionMask )
+        
+        #----------------------------------------------------
+        
+        maskArray = np.copy( startMask )
+        possiblyForeground = ( maskArray > 0 ) & ( accumulatorImage > 0 )
+        maskArray[ possiblyForeground ] = self.GC_PR_FGD
+        maskArray[ possiblyForeground == False ] = self.GC_PR_BGD
+        maskArray[ exclusionMask == 0 ] = self.GC_BGD
+        
+        definiteMask = np.copy( accumulatorImage )
+        definiteMask[ possiblyForeground ] = 255
+        definiteMask[ possiblyForeground == False ] = 0
+        cv.Erode( definiteMask, definiteMask )
+        cv.Erode( definiteMask, definiteMask )
+        maskArray[ definiteMask == 255 ] = self.GC_FGD
+        
+        # Now create the working mask and segment the image
+        
+        workingMask = np.copy( maskArray )
+            
+        fgModel = cv.CreateMat( 1, 5*13, cv.CV_64FC1 )
+        cv.Set( fgModel, 0 )
+        bgModel = cv.CreateMat( 1, 5*13, cv.CV_64FC1 )
+        cv.Set( bgModel, 0 )
+        
+        workingImage = np.copy( startFrame )
+        cv.GrabCut( workingImage, workingMask, 
+            (0,0,0,0), fgModel, bgModel, 6, self.GC_INIT_WITH_MASK )
+            
+        cv.Set( fgModel, 0 )
+        cv.Set( bgModel, 0 )
+        bgdPixels = (workingMask != self.GC_PR_FGD) & (workingMask != self.GC_FGD)
+        workingMask[ bgdPixels ] = 0
+        workingMask[ bgdPixels == False ] = 255
+        cv.Erode( workingMask, workingMask )
+        bgdPixels = workingMask == 0
+        workingMask[ bgdPixels ] = self.GC_PR_BGD
+        workingMask[ bgdPixels == False ] = self.GC_PR_FGD
+        workingMask[ exclusionMask == 0 ] = self.GC_BGD
+        
+        cv.GrabCut( workingImage, workingMask, 
+            (0,0,0,0), fgModel, bgModel, 6, self.GC_INIT_WITH_MASK )
+        
+        segmentation = np.copy( startFrame )
+        segmentation[ (workingMask != self.GC_PR_FGD) & (workingMask != self.GC_FGD) ] = 0
+        
+        # Remove everything apart from the biggest blob in the ROI
+        graySeg = np.zeros( ( startFrame.height, startFrame.width ), dtype=np.uint8 )
+        cv.CvtColor( segmentation, graySeg, cv.CV_RGB2GRAY )
+        startMask = np.copy( graySeg )
+        startMask[ startMask > 0 ] = 255
+            
+        # Find the larget blob in the ROI
+        
+        # Label blobs
+        startMask, numBlobs = PyBlobLib.labelBlobs( startMask )
+        
+        # Find blobs in the region of interest
+        testMap = np.copy( startMask )
+        testMap[ :ROI_Y, : ] = 0       # Mask out area above the ROI
+        testMap[ :, :ROI_X ] = 0       # Mask out area to the left of the ROI
+        testMap[ ROI_Y+ROI_HEIGHT: ] = 0   # Mask out area below the ROI
+        testMap[ :, ROI_X+ROI_WIDTH: ] = 0   # Mask out area to the right of the ROI
+    
+        biggestBlobIdx = None
+        biggestBlobSize = 0
+    
+        for blobIdx in range( 1, numBlobs + 1 ):
+            if testMap[ testMap == blobIdx ].size > 0:
+                blobSize = startMask[ startMask == blobIdx ].size
+                if blobSize > biggestBlobSize:
+                    biggestBlobSize = blobSize
+                    biggestBlobIdx = blobIdx
+    
+        # Isolate the largest blob
+        if biggestBlobIdx != None:
+            biggestBlobPixels = (startMask == biggestBlobIdx)
+            segmentation[ biggestBlobPixels == False, 0 ] = 255
+            segmentation[ biggestBlobPixels == False, 1 ] = 0
+            segmentation[ biggestBlobPixels == False, 2 ] = 255
+        else:
+            print "No central blob after main segmentation"
+            return blankFrame
+        
+        return segmentation
+
+    #---------------------------------------------------------------------------
     def processBag( self, bag ):
     
-        FLIP_IMAGE = False
+        FLIP_IMAGE = bool( self.options.frameFlip == "True" )
         USING_OPTICAL_FLOW_FOR_MOTION = False
+        print "frameFlip = ", FLIP_IMAGE
     
         bagFrameIdx = 0
         frameIdx = 0
@@ -762,11 +946,21 @@ class MainWindow:
             
             if impactFrameIdx != None:
                 
-                NUM_FRAMES_BEFORE = 8
-                BASE_MOTION_IMAGE_NAME = self.scriptPath + "/../../test_data/impact_images/motion_{0:03}.png"
-                START_MOTION_IMAGE_NAME = self.scriptPath + "/../../test_data/impact_images/start_motion.png"
-                START_IMAGE_NAME = self.scriptPath + "/../../test_data/impact_images/start.png"
-                IMPACT_IMAGE_NAME = self.scriptPath + "/../../test_data/impact_images/impact.png"
+                preMotionImages = []
+                postMotionImages = []
+                impactMotionImage = None
+                
+                NUM_FRAMES_BEFORE = 3
+                
+                prefix = self.options.outputPrefix
+                if prefix != "":
+                    prefix += "_"
+                
+                BASE_MOTION_IMAGE_NAME = self.scriptPath + "/../../test_data/impact_images/" + prefix + "motion_{0:03}.png"
+                START_MOTION_IMAGE_NAME = self.scriptPath + "/../../test_data/impact_images/" + prefix + "start_motion.png"
+                START_IMAGE_NAME = self.scriptPath + "/../../test_data/impact_images/" + prefix + "start.png"
+                IMPACT_IMAGE_NAME = self.scriptPath + "/../../test_data/impact_images/" + prefix + "impact.png"
+                SEGMENTATION_IMAGE_NAME = self.scriptPath + "/../../test_data/impact_images/" + prefix + "segmentation.png"
                 NUM_FRAMES_AFTER = 3
                 
                 width = self.motionImageList[ 0 ].shape[ 1 ]
@@ -777,6 +971,14 @@ class MainWindow:
                     impactFrameIdx + NUM_FRAMES_AFTER + 1 ):
                     
                     motionImage = self.motionImageList[ frameIdx ]  
+                    
+                    if frameIdx < impactFrameIdx:
+                        preMotionImages.append( motionImage )
+                    elif frameIdx == impactFrameIdx:
+                        impactMotionImage = motionImage
+                    else: # frameIdx > impactFrameIdx
+                        postMotionImages.append( motionImage )
+                    
                     colourImage[ :, :, 0 ] = motionImage
                     colourImage[ :, :, 1 ] = motionImage
                     colourImage[ :, :, 2 ] = motionImage
@@ -796,11 +998,22 @@ class MainWindow:
                 cv.SaveImage( START_IMAGE_NAME, colourImage )
                 cv.CvtColor( self.inputImageList[ impactFrameIdx ], colourImage, cv.CV_RGB2BGR )    
                 cv.SaveImage( IMPACT_IMAGE_NAME, colourImage )
+                
+                print "Segmenting..."
+                segmentation = self.produceSegmentation( self.inputImageList[ 0 ], 
+                    impactMotionImage, preMotionImages, postMotionImages )
+                cv.CvtColor( segmentation, colourImage, cv.CV_RGB2BGR )    
+                cv.SaveImage( SEGMENTATION_IMAGE_NAME, colourImage )
                     
             self.refreshGraphDisplay()
             
             
         print "Finished processing bag file"
+        if bool( self.options.quitAfterFirstSegmentation == "True" ):
+            print "Trying to quit"
+            self.onWinMainDestroy( None )
+        else:
+            print "Not trying to quit so neeah"
         
     #---------------------------------------------------------------------------
     def refreshGraphDisplay( self ):
@@ -854,9 +1067,25 @@ class MainWindow:
 #-------------------------------------------------------------------------------
 if __name__ == "__main__":
 
-    bagFilename = None
-    if len( sys.argv ) >= 2:
-        bagFilename = sys.argv[ 1 ]
+    parser = OptionParser()
+    parser.add_option( "-q", "--quit", dest="quitAfterFirstSegmentation", default="False",
+                  help="Quit after first segmentation (for scripts)" )
+    parser.add_option( "-p", "--prefix", dest="outputPrefix", default="",
+                  help="Prefix to put in front of all output images" )
+    parser.add_option( "-f", "--flip", dest="frameFlip", default="False",
+                  help="Flip image horizontally" )
+    parser.add_option( "-s", "--skip", dest="frameSkip", default="1",
+                  help="Num frames to increment by each time" )
 
-    mainWindow = MainWindow( bagFilename )
+    (options, args) = parser.parse_args()
+    
+    print options.quitAfterFirstSegmentation
+    print options.outputPrefix
+    print options.frameFlip
+    
+    bagFilename = None
+    if len( args ) > 0:
+        bagFilename = args[ 0 ]
+
+    mainWindow = MainWindow( options, bagFilename )
     mainWindow.main()
