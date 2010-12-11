@@ -32,6 +32,7 @@ class MinMaxSlider( gtk.VBox ):
         self.tbxMax = builder.get_object( "tbxMax" )
         self.sliderValue = builder.get_object( "sliderValue" )
         self.adjValue = builder.get_object( "adjValue" )
+        self.checkTicked = builder.get_object( "checkTicked" )
         
         window.remove( hboxWidget )
         self.pack_start( hboxWidget )
@@ -114,6 +115,10 @@ class MinMaxSlider( gtk.VBox ):
     #---------------------------------------------------------------------------
     def setValue( self, newValue ):
         return self.adjValue.set_value( newValue )
+        
+    #---------------------------------------------------------------------------
+    def isTicked( self ):
+        return self.checkTicked.get_active()
        
     #---------------------------------------------------------------------------
     def onTbxMinChanged( self, widget ):
