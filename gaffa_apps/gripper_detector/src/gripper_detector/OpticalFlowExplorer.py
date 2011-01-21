@@ -257,6 +257,29 @@ class MainWindow:
         #self.axisROC.plot( self.rocCurve.thresholds, self.rocCurve.specificity )
         
         self.refreshGraphDisplay()
+        
+        outputFile = open( self.scriptPath + "/../../test_results/CrossCorrelation.csv", "w" )
+        numSamples = len( regSeq.regularSampleTimes )
+        
+        correlationChannel = corSeq.correlationChannels[ 0 ][ testY ][ testX ]
+        numCorrelationSamples = len( correlationChannel )
+        
+        print >>outputFile, "Time,Input,Output,CrossCorrelation"
+        for i in range( numSamples ):
+            
+            if i < numCorrelationSamples:
+                correlationData = correlationChannel[ i ]
+            else:
+                correlationData = 0.0
+            
+            print >>outputFile, "{0},{1},{2},{3}".format( 
+                regSeq.regularSampleTimes[ i ], 
+                normalisedServoAngleData[ i ],
+                normalisedOpticalFlowDataX[ i ],
+                correlationData )
+        
+        outputFile.close()
+                
     
     #---------------------------------------------------------------------------
     def refreshGraphDisplay( self ):
