@@ -14,7 +14,7 @@ import cv
 #-------------------------------------------------------------------------------
 parser = OptionParser()
 parser.add_option( "-p", "--prefix", dest="prefix", default="image_",
-                  help="Prefix of putput images", metavar="FILE" )
+                  help="Prefix of output images", metavar="FILE" )
 parser.add_option( "-i", "--increment", dest="frameIncrement", default="1",
                   help="Number of frames to advance with each step" )
 parser.add_option( "-f", "--format", dest="imageFormat", default="png",
