@@ -8,12 +8,16 @@
     <glade-widget-class name="SequenceControl"
                         generic-name="sequenceControl"
                         title="Sequence Control" />
+    <glade-widget-class name="MinMaxSlider"
+                        generic-name="slider"
+                        title="MinMax Slider" />
   </glade-widget-classes>
 
   <glade-widget-group name="abroun_widgets" title="abroun Widgets">
 
     <glade-widget-class-ref name="FilePath"/>
     <glade-widget-class-ref name="SequenceControl"/>
+    <glade-widget-class-ref name="MinMaxSlider"/>
 
   </glade-widget-group>
   
