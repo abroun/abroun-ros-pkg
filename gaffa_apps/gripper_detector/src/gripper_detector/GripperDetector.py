@@ -172,8 +172,8 @@ class MainWindow:
         servoConfigList = [ self.servoConfigDict[ servoName ] for servoName in self.servoConfigDict ]
         self.roboticArm = RoboticArm( gaffa_teleop.LynxmotionArmDescription.ARM_DH_PROXIMAL, servoConfigList )
         
-        #self.cameraImageTopic = rospy.Subscriber( "/camera/image", 
-        #    sensor_msgs.msg.Image, self.cameraImageCallback )
+        self.cameraImageTopic = rospy.Subscriber( "/camera/image", 
+            sensor_msgs.msg.Image, self.cameraImageCallback )
             
         self.opticalFlowFilter = OpticalFlowFilter(
             self.OPTICAL_FLOW_BLOCK_WIDTH, self.OPTICAL_FLOW_BLOCK_HEIGHT,
@@ -184,6 +184,7 @@ class MainWindow:
         self.inputSignalDetectedArray = None
         self.gripperHistogram = None
         self.gripperTrackWindow = None
+        self.imageIdx = 0
         
         # Setup the GUI        
         builder = gtk.Builder()
@@ -237,6 +238,36 @@ class MainWindow:
             # Look for optical flow between this image and the last one
             self.opticalFlowX, self.opticalFlowY = self.opticalFlowFilter.calcOpticalFlow( curImageGray )
             
+            # Draw the optical flow if it's available
+            if self.opticalFlowX != None and self.opticalFlowY != None:
+
+                lineColor = cv.CV_RGB( 0, 255, 0 )
+            
+                blockCentreY = self.OPTICAL_FLOW_BLOCK_HEIGHT / 2
+                for y in range( self.opticalFlowX.shape[ 0 ] ):
+                
+                    blockCentreX = self.OPTICAL_FLOW_BLOCK_WIDTH / 2
+                    for x in range( self.opticalFlowX.shape[ 1 ] ):
+                        
+                        endX = blockCentreX + cv.Get2D( self.opticalFlowX, y, x )[ 0 ]
+                        endY = blockCentreY + cv.Get2D( self.opticalFlowY, y, x )[ 0 ]
+                        
+                        cv.Line( curImage, ( int( blockCentreX ), int( blockCentreY ) ),
+                            ( int( endX ), int( endY ) ), lineColor )    
+                        
+                        blockCentreX += self.OPTICAL_FLOW_BLOCK_WIDTH
+                        
+                    blockCentreY += self.OPTICAL_FLOW_BLOCK_HEIGHT    
+
+            # Save the image
+            imageBGR = cv.CreateImage( ( rosImage.width, rosImage.height ), cv.IPL_DEPTH_8U, 3 )
+            cv.CvtColor( curImage, imageBGR, cv.CV_RGB2BGR )
+            cv.SaveImage( "/home/abroun/VideoTemp/frame{0:05}.png".format( self.imageIdx ), imageBGR )
+            self.imageIdx += 1
+
+            self.lastImage = curImage
+            return
+
             # Use CAMShift to track the gripper
             gripperProbabilityImage = None
             if self.gripperHistogram != None and self.gripperTrackWindow != None:
