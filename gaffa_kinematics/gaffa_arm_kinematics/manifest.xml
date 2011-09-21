@@ -25,7 +25,7 @@
 
   <export>
    <cpp cflags="-I${prefix}/include" lflags="-Wl,-rpath,${prefix}/lib -L${prefix}/lib -lgaffa_arm_kinematics_lib"/>
-  <kinematics_base plugin="${prefix}/kinematics_plugins.xml" />
+   <!--<kinematics_base plugin="${prefix}/kinematics_plugins.xml" />-->
   </export>
 
 </package>
