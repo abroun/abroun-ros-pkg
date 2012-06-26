@@ -23,11 +23,13 @@ class OpticalFlowFilter:
 
     #---------------------------------------------------------------------------
     def calcOpticalFlowWidth( self, imageWidth ):
-        return int((imageWidth - self.opticalFlowBlockWidth)/self.opticalFlowBlockWidth)
+        #return int((imageWidth - self.opticalFlowBlockWidth)/self.opticalFlowBlockWidth)
+        return int(imageWidth/self.opticalFlowBlockWidth)   # AB: Changed for OpenCV 2.4
         
     #---------------------------------------------------------------------------
     def calcOpticalFlowHeight( self, imageHeight ):
-        return int((imageHeight - self.opticalFlowBlockHeight)/self.opticalFlowBlockHeight)
+        #return int((imageHeight - self.opticalFlowBlockHeight)/self.opticalFlowBlockHeight)
+        return int(imageHeight/self.opticalFlowBlockHeight) # AB: Changed for OpenCV 2.4
         
     #---------------------------------------------------------------------------
     def calcOpticalFlow( self, curImageGray, method="BlockMatching" ):
@@ -52,7 +54,8 @@ class OpticalFlowFilter:
                 ( self.opticalFlowBlockWidth, self.opticalFlowBlockHeight ),
                 ( self.opticalFlowBlockWidth, self.opticalFlowBlockHeight ),
                 ( self.opticalFlowRangeWidth, self.opticalFlowRangeHeight ),
-                0, opticalFlowArrayX, opticalFlowArrayY )
+                0, cv.fromarray( opticalFlowArrayX ), cv.fromarray( opticalFlowArrayY ) )
+            
         elif method == "LucasKanade":
             
             largeOpticalFlowArrayX = np.ndarray( shape=( lastImageGray.height, lastImageGray.width ), dtype=np.float32 )
@@ -60,7 +63,7 @@ class OpticalFlowFilter:
             
             cv.CalcOpticalFlowLK( lastImageGray, curImageGray,
                 ( 15, 15 ), #( self.opticalFlowBlockWidth, self.opticalFlowBlockHeight ),
-                largeOpticalFlowArrayX, largeOpticalFlowArrayY )
+                cv.fromarray( largeOpticalFlowArrayX ), cv.fromarray( largeOpticalFlowArrayY ) )
                 
             indexGrid = np.mgrid[ 0:storageHeight, 0:storageWidth ]
             indexGrid[ 0 ] = indexGrid[ 0 ]*self.opticalFlowBlockHeight + self.opticalFlowBlockHeight/2
@@ -73,7 +76,7 @@ class OpticalFlowFilter:
             largeOpticalFlowArrayY = np.ndarray( shape=( lastImageGray.height, lastImageGray.width ), dtype=np.float32 )
             
             cv.CalcOpticalFlowHS( lastImageGray, curImageGray,
-                0, largeOpticalFlowArrayX, largeOpticalFlowArrayY,
+                0, cv.fromarray( largeOpticalFlowArrayX ), cv.fromarray( largeOpticalFlowArrayY ),
                 1.0, (cv.CV_TERMCRIT_ITER | cv.CV_TERMCRIT_EPS, 10, 0.01) )
                 
             indexGrid = np.mgrid[ 0:storageHeight, 0:storageWidth ]

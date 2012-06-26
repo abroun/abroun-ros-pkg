@@ -1,5 +1,4 @@
 
-from ros import rosrecord
 import rosbag
 import numpy as np
 import cv
@@ -159,7 +158,7 @@ class InputSequence:
         
         # Create an OpenCV image to process the data
         curImageGray = cv.CreateImage( ( image.shape[ 1 ], image.shape[ 0 ] ), cv.IPL_DEPTH_8U, 1 )
-        cv.CvtColor( image, curImageGray, cv.CV_RGB2GRAY )
+        cv.CvtColor( cv.fromarray( image ), curImageGray, cv.CV_RGB2GRAY )
         
         # Look for optical flow between this image and the last one
         opticalFlowArrayX, opticalFlowArrayY = \

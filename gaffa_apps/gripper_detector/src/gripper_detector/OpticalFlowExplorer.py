@@ -4,7 +4,6 @@
 import roslib
 roslib.load_manifest( 'gripper_detector' )
 import rospy
-from ros import rosrecord
 
 
 import sys
@@ -57,10 +56,10 @@ def printTiming(func):
 #-------------------------------------------------------------------------------
 class MainWindow:
     
-    OPTICAL_FLOW_BLOCK_WIDTH = 8
-    OPTICAL_FLOW_BLOCK_HEIGHT = 8
-    OPTICAL_FLOW_RANGE_WIDTH = 8    # Range to look outside of a block for motion
-    OPTICAL_FLOW_RANGE_HEIGHT = 8
+    OPTICAL_FLOW_BLOCK_WIDTH = 16
+    OPTICAL_FLOW_BLOCK_HEIGHT = 16
+    OPTICAL_FLOW_RANGE_WIDTH = 16    # Range to look outside of a block for motion
+    OPTICAL_FLOW_RANGE_HEIGHT = 16
     OPTICAL_FLOW_METHOD = "BlockMatching"
     #OPTICAL_FLOW_METHOD = "LucasKanade"
     #OPTICAL_FLOW_METHOD = "HornSchunck"
@@ -72,8 +71,8 @@ class MainWindow:
     GROUND_TRUTH_FILENAME = "/../../config/TightBasicWave_Gripper.yaml"
     
     CORRELATION_THRESHOLD = 0.52
-    MAX_TEST_POINT_X = (320 - OPTICAL_FLOW_BLOCK_WIDTH)/OPTICAL_FLOW_BLOCK_WIDTH - 1
-    MAX_TEST_POINT_Y = (240 - OPTICAL_FLOW_BLOCK_HEIGHT)/OPTICAL_FLOW_BLOCK_HEIGHT - 1
+    MAX_TEST_POINT_X = (640 - OPTICAL_FLOW_BLOCK_WIDTH)/OPTICAL_FLOW_BLOCK_WIDTH - 1
+    MAX_TEST_POINT_Y = (480 - OPTICAL_FLOW_BLOCK_HEIGHT)/OPTICAL_FLOW_BLOCK_HEIGHT - 1
     
     SAMPLES_PER_SECOND = 30.0
     MAX_CORRELATION_LAG = 1.0
@@ -162,7 +161,7 @@ class MainWindow:
                     maskArray[ rowStartIdx:rowEndIdx, colStartIdx:colEndIdx ] = 255
 
         cv.CalcHist( [ cv.GetImage( i ) for i in planes ], 
-            self.gripperHistogram, 0, mask=maskArray )
+            self.gripperHistogram, 0, mask=cv.fromarray( maskArray ) )
         
         markerBuffer = MarkerBuffer.loadMarkerBuffer( self.scriptPath + self.GROUND_TRUTH_FILENAME )
         if markerBuffer == None:
