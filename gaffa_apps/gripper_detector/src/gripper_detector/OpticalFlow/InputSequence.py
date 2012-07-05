@@ -73,6 +73,11 @@ class InputSequence:
             
                     image = np.fromstring( msg.data, dtype=np.uint8 )
                     image.shape = ( msg.height, msg.width, 3 )
+                    
+                    if msg.encoding == "bgr8":
+                        # BGR to RGB
+                        image = np.copy( image[ :, :,[2,1,0] ] )
+                    
                     self.cameraImages.append( image )
             
                 else:
