@@ -8,7 +8,7 @@ from optparse import OptionParser
 import roslib
 roslib.load_manifest( 'abroun_util' )
 import rosbag
-from roslib.rostime import Time
+#from roslib.rostime import Time
 import cv
 
 #-------------------------------------------------------------------------------
@@ -56,7 +56,7 @@ else:
                 # Extract the image and save using OpenCV
                 curImage = cv.CreateImageHeader( ( msg.width, msg.height ), cv.IPL_DEPTH_8U, 3 )
                 cv.SetData( curImage, msg.data, msg.step )
-                cv.CvtColor( curImage, curImage, cv.CV_RGB2BGR )
+                #cv.CvtColor( curImage, curImage, cv.CV_RGB2BGR )
                 
                 imageFilename = "{0}{1:08d}.{2}".format( options.prefix, imageIdx, options.imageFormat )
                 cv.SaveImage( imageFilename, curImage )
